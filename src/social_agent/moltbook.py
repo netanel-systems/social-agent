@@ -216,15 +216,36 @@ class MoltbookClient:
             )
         return RegisterResult(success=False, error=f"Unexpected response: {body}")
 
-    def get_feed(self, submolt: str, limit: int = 10) -> FeedResult:
-        """Read posts from a submolt.
+    def check_status(self) -> dict[str, Any]:
+        """Check agent claim status.
+
+        Returns:
+            Dict with 'status' key ('pending_claim' or 'claimed') and other info.
+        """
+        logger.info("Checking agent status")
+        resp = self._execute("get", "/agents/status")
+        if "error" in resp:
+            return {"status": "unknown", "error": resp["error"]}
+        body = resp.get("body", {})
+        if isinstance(body, dict):
+            return body
+        return {"status": "unknown", "error": f"Unexpected response: {body}"}
+
+    def get_feed(self, submolt: str = "", limit: int = 10) -> FeedResult:
+        """Read posts from the global feed or a submolt.
 
         Args:
-            submolt: Submolt name (e.g. 'agents', 'aitools').
+            submolt: Submolt name to filter by (empty for global feed).
             limit: Max posts to return.
         """
-        logger.info("Reading feed: %s (limit=%d)", submolt, limit)
-        resp = self._execute("get", f"/submolts/{submolt}/posts", params={"limit": limit})
+        if submolt:
+            logger.info("Reading submolt feed: %s (limit=%d)", submolt, limit)
+            resp = self._execute(
+                "get", "/posts", params={"submolt": submolt, "sort": "new", "limit": limit}
+            )
+        else:
+            logger.info("Reading global feed (limit=%d)", limit)
+            resp = self._execute("get", "/posts", params={"sort": "new", "limit": limit})
 
         if "error" in resp:
             return FeedResult(success=False, error=resp["error"])
@@ -269,8 +290,8 @@ class MoltbookClient:
         logger.info("Creating post in %s: '%s'", submolt, title[:50])
         resp = self._execute(
             "post",
-            f"/submolts/{submolt}/posts",
-            body={"title": title, "body": body},
+            "/posts",
+            body={"title": title, "body": body, "submolt": submolt},
         )
 
         if "error" in resp:
@@ -335,15 +356,15 @@ class MoltbookClient:
         return EngagementResult(success=False, error=f"Unexpected response: {body}")
 
     def heartbeat(self) -> HeartbeatResult:
-        """Send heartbeat to keep agent active."""
+        """Send heartbeat by checking agent status."""
         logger.debug("Sending heartbeat")
-        resp = self._execute("post", "/agents/heartbeat")
+        resp = self._execute("get", "/agents/status")
 
         if "error" in resp:
             return HeartbeatResult(success=False, error=resp["error"])
 
         status = resp.get("status", 0)
-        if status not in (200, 204):
+        if status != 200:
             return HeartbeatResult(
                 success=False, error=f"HTTP {status}: {resp.get('body')}"
             )

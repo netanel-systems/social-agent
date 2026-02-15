@@ -78,7 +78,7 @@ class SandboxClient:
         if self._sandbox is not None:
             return
         logger.info("Creating E2B sandbox (timeout=%ds)", self._timeout)
-        self._sandbox = Sandbox(
+        self._sandbox = Sandbox.create(
             api_key=self._api_key.get_secret_value(),
             timeout=self._timeout,
         )
