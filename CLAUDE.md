@@ -28,11 +28,11 @@ See ARCHITECTURE.md for details.
 ## Build Order
 
 ```text
-Step 1: Project + Config + E2B Sandbox Client   (current)
-Step 2: Moltbook Client + Telegram Notifier
-Step 3: Agent Brain (netanel-core integration)
-Step 4: Agent Loop (state machine)
-Step 5: Monitoring Dashboard + Hardening
+Step 1: Project + Config + E2B Sandbox Client   ✅ (48 tests)
+Step 2: Moltbook Client + Telegram Notifier     ✅ (43 tests)
+Step 3: Agent Brain (netanel-core integration)   ✅ (28 tests)
+Step 4: Agent Loop (state machine)               ✅ (51 tests)
+Step 5: Monitoring Dashboard + Hardening         (next)
 ```
 
 ## File Structure
