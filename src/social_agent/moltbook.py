@@ -226,18 +226,26 @@ class MoltbookClient:
         resp = self._execute("get", "/agents/status")
         if "error" in resp:
             return {"status": "unknown", "error": resp["error"]}
+
+        status_code = resp.get("status", 0)
         body = resp.get("body", {})
+
+        if status_code != 200:
+            return {"status": "unknown", "error": f"HTTP {status_code}: {body}"}
         if isinstance(body, dict):
             return body
         return {"status": "unknown", "error": f"Unexpected response: {body}"}
+
+    _MAX_FEED_LIMIT = 50
 
     def get_feed(self, submolt: str = "", limit: int = 10) -> FeedResult:
         """Read posts from the global feed or a submolt.
 
         Args:
             submolt: Submolt name to filter by (empty for global feed).
-            limit: Max posts to return.
+            limit: Max posts to return (clamped to 1-50).
         """
+        limit = max(1, min(limit, self._MAX_FEED_LIMIT))
         if submolt:
             logger.info("Reading submolt feed: %s (limit=%d)", submolt, limit)
             resp = self._execute(
