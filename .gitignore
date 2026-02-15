@@ -27,6 +27,9 @@ memories/
 logs/
 *.log
 
+# Agent state (runtime)
+state.json
+
 # OS
 .DS_Store
 Thumbs.db
