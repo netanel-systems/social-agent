@@ -1,5 +1,6 @@
 """social-agent: Autonomous self-learning agent on Moltbook, powered by netanel-core."""
 
+from .brain import AgentBrain
 from .config import Settings, get_settings
 from .moltbook import (
     EngagementResult,
@@ -15,6 +16,7 @@ from .sandbox import BashResult, ExecutionResult, SandboxClient
 from .telegram import Level, TelegramNotifier
 
 __all__ = [
+    "AgentBrain",
     "BashResult",
     "EngagementResult",
     "ExecutionResult",
