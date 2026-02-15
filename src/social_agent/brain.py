@@ -134,6 +134,9 @@ class AgentBrain:
             ValueError: If namespace is unknown or task is empty.
         """
         self._validate_namespace(namespace)
+        if not task or not task.strip():
+            msg = "task must be a non-empty string"
+            raise ValueError(msg)
         llm = self._get_or_create(namespace)
         return llm.call(task)
 

@@ -80,6 +80,18 @@ def test_call_unknown_namespace(brain: AgentBrain) -> None:
         brain.call("not-a-namespace", "task")
 
 
+def test_call_empty_task(brain: AgentBrain) -> None:
+    """call() rejects empty task strings."""
+    with pytest.raises(ValueError, match="non-empty"):
+        brain.call("moltbook-decide", "")
+
+
+def test_call_whitespace_task(brain: AgentBrain) -> None:
+    """call() rejects whitespace-only task strings."""
+    with pytest.raises(ValueError, match="non-empty"):
+        brain.call("moltbook-decide", "   ")
+
+
 def test_stats_unknown_namespace(brain: AgentBrain) -> None:
     """stats() rejects unknown namespaces."""
     with pytest.raises(ValueError, match="Unknown namespace"):
@@ -91,7 +103,7 @@ def test_stats_unknown_namespace(brain: AgentBrain) -> None:
 
 @patch("social_agent.brain.LearningLLM")
 def test_prompt_seeded_on_first_use(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """Initial prompt is written to disk on first namespace use."""
     brain = AgentBrain(memories_dir=tmp_memories)
@@ -109,7 +121,7 @@ def test_prompt_seeded_on_first_use(
 
 @patch("social_agent.brain.LearningLLM")
 def test_prompt_not_overwritten(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """Existing prompt is preserved (not overwritten on re-init)."""
     brain = AgentBrain(memories_dir=tmp_memories)
@@ -130,7 +142,7 @@ def test_prompt_not_overwritten(
 
 @patch("social_agent.brain.LearningLLM")
 def test_all_namespaces_seed_correctly(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """All 4 namespaces seed their prompts."""
     brain = AgentBrain(memories_dir=tmp_memories)
@@ -255,7 +267,7 @@ def test_stats_initialized_namespace(
 
 @patch("social_agent.brain.LearningLLM")
 def test_all_stats_covers_all_namespaces(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """all_stats() returns stats for all 4 namespaces."""
     brain = AgentBrain(memories_dir=tmp_memories)
@@ -289,7 +301,7 @@ def test_all_stats_mixed_initialized(
 
 @patch("social_agent.brain.LearningLLM")
 def test_get_store_returns_memory_store(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """get_store() returns the MemoryStore for a namespace."""
     brain = AgentBrain(memories_dir=tmp_memories)
@@ -302,7 +314,7 @@ def test_get_store_returns_memory_store(
 
 @patch("social_agent.brain.LearningLLM")
 def test_get_store_unknown_namespace(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """get_store() rejects unknown namespaces."""
     brain = AgentBrain(memories_dir=tmp_memories)
@@ -315,7 +327,7 @@ def test_get_store_unknown_namespace(
 
 @patch("social_agent.brain.LearningLLM")
 def test_config_uses_correct_namespace(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """NathanConfig is created with the correct namespace."""
     brain = AgentBrain(memories_dir=tmp_memories)
@@ -328,7 +340,7 @@ def test_config_uses_correct_namespace(
 
 @patch("social_agent.brain.LearningLLM")
 def test_config_uses_custom_models(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """NathanConfig picks up custom model settings."""
     brain = AgentBrain(
@@ -346,7 +358,7 @@ def test_config_uses_custom_models(
 
 @patch("social_agent.brain.LearningLLM")
 def test_config_uses_custom_quality_threshold(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """NathanConfig applies custom quality threshold to both safety and eval."""
     brain = AgentBrain(
@@ -362,7 +374,7 @@ def test_config_uses_custom_quality_threshold(
 
 @patch("social_agent.brain.LearningLLM")
 def test_directories_created_on_init(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """Memory directories are created when a namespace is initialized."""
     brain = AgentBrain(memories_dir=tmp_memories)
@@ -416,7 +428,7 @@ def test_multiple_calls_same_namespace(
 
 @patch("social_agent.brain.LearningLLM")
 def test_initialized_namespaces_ordering(
-    mock_llm_class: MagicMock, tmp_memories: Path
+    _mock_llm_class: MagicMock, tmp_memories: Path
 ) -> None:
     """initialized_namespaces reflects order of initialization."""
     brain = AgentBrain(memories_dir=tmp_memories)
