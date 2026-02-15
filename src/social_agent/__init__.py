@@ -3,6 +3,14 @@
 from .agent import Action, ActivityRecord, Agent, AgentState, CycleResult
 from .brain import AgentBrain
 from .config import Settings, get_settings
+from .dashboard import (
+    ActionStats,
+    DashboardData,
+    build_dashboard,
+    compute_action_stats,
+    format_dashboard,
+    load_activity_log,
+)
 from .moltbook import (
     EngagementResult,
     FeedResult,
@@ -18,11 +26,14 @@ from .telegram import Level, TelegramNotifier
 
 __all__ = [
     "Action",
+    "ActionStats",
     "ActivityRecord",
     "Agent",
     "AgentBrain",
     "AgentState",
     "BashResult",
+    "CycleResult",
+    "DashboardData",
     "EngagementResult",
     "ExecutionResult",
     "FeedResult",
@@ -32,11 +43,14 @@ __all__ = [
     "MoltbookPost",
     "NAMESPACES",
     "PROMPTS",
-    "CycleResult",
     "PostResult",
     "RegisterResult",
     "SandboxClient",
     "Settings",
     "TelegramNotifier",
+    "build_dashboard",
+    "compute_action_stats",
+    "format_dashboard",
     "get_settings",
+    "load_activity_log",
 ]

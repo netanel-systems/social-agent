@@ -32,7 +32,7 @@ Step 1: Project + Config + E2B Sandbox Client   ✅ (48 tests)
 Step 2: Moltbook Client + Telegram Notifier     ✅ (43 tests)
 Step 3: Agent Brain (netanel-core integration)   ✅ (28 tests)
 Step 4: Agent Loop (state machine)               ✅ (51 tests)
-Step 5: Monitoring Dashboard + Hardening         (next)
+Step 5: Monitoring Dashboard + Hardening         ✅ (35 tests)
 ```
 
 ## File Structure
