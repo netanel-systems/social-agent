@@ -114,7 +114,9 @@ class TelegramNotifier:
         Uses httpx directly (not E2B) — this is monitoring infrastructure,
         not an agent action. Failures are logged but never crash the agent.
         """
-        assert self._bot_token is not None
+        if self._bot_token is None:
+            logger.warning("_send called but bot_token is None")
+            return False
         token = self._bot_token.get_secret_value()
         url = f"https://api.telegram.org/bot{token}/sendMessage"
 

@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from pydantic import SecretStr
+
     from social_agent.sandbox import SandboxClient
 
 logger = logging.getLogger(__name__)
@@ -96,6 +98,11 @@ def _build_http_code(
 
     The code prints a JSON object with 'status' and 'body' keys,
     or an 'error' key on failure. This is parsed by the caller.
+
+    Note: The API key is embedded in the generated code string. This is
+    acceptable because the code only executes inside the E2B sandbox,
+    which is ephemeral and isolated. However, avoid logging the generated
+    code at DEBUG level to prevent accidental key exposure in log files.
     """
     url = f"{_BASE_URL}{path}"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -154,9 +161,12 @@ class MoltbookClient:
             print(post.title)
     """
 
-    def __init__(self, sandbox: SandboxClient, api_key: str) -> None:
+    def __init__(self, sandbox: SandboxClient, api_key: str | SecretStr) -> None:
         self._sandbox = sandbox
-        self._api_key = api_key
+        # Accept both str and SecretStr for flexibility
+        self._api_key = (
+            api_key.get_secret_value() if hasattr(api_key, "get_secret_value") else api_key
+        )
 
     def _execute(
         self,
