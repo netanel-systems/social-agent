@@ -260,12 +260,26 @@ class MoltbookClient:
         if isinstance(body, list):
             for item in body:
                 if isinstance(item, dict):
+                    # Author may be string or {"id": ..., "name": ...}
+                    author_raw = item.get("author", "")
+                    if isinstance(author_raw, dict):
+                        author = str(author_raw.get("name", ""))
+                    else:
+                        author = str(author_raw)
+
+                    # Submolt may be string or {"id": ..., "name": ...}
+                    submolt_raw = item.get("submolt", submolt)
+                    if isinstance(submolt_raw, dict):
+                        post_submolt = str(submolt_raw.get("name", submolt))
+                    else:
+                        post_submolt = str(submolt_raw) if submolt_raw else submolt
+
                     posts.append(MoltbookPost(
                         id=str(item.get("id", "")),
                         title=str(item.get("title", "")),
                         body=str(item.get("body", "")),
-                        submolt=submolt,
-                        author=str(item.get("author", "")),
+                        submolt=post_submolt,
+                        author=author,
                         upvotes=int(item.get("upvotes", 0)),
                         comments_count=int(item.get("comments_count", 0)),
                         created_at=str(item.get("created_at", "")),
