@@ -179,6 +179,12 @@ def test_negative_max_cycles_rejected(required_env: dict[str, object]) -> None:
         Settings(**required_env, max_cycles=-1)  # type: ignore[arg-type]
 
 
+def test_zero_circuit_breaker_rejected(required_env: dict[str, object]) -> None:
+    """Zero circuit_breaker_threshold raises ValidationError."""
+    with pytest.raises(ValidationError, match="positive"):
+        Settings(**required_env, circuit_breaker_threshold=0)  # type: ignore[arg-type]
+
+
 # --- extra="forbid" ---
 
 

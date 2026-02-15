@@ -101,7 +101,9 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         return v
 
-    @field_validator("max_posts_per_day", "max_replies_per_day", "max_cycles")
+    @field_validator(
+        "max_posts_per_day", "max_replies_per_day", "max_cycles", "circuit_breaker_threshold"
+    )
     @classmethod
     def positive_limits(cls, v: int) -> int:
         """All limits must be positive."""

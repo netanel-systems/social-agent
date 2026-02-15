@@ -101,7 +101,7 @@ class SandboxClient:
         """Lazy init — create sandbox on first use."""
         if self._sandbox is None:
             self.start()
-        assert self._sandbox is not None  # noqa: S101
+        assert self._sandbox is not None
         return self._sandbox
 
     def execute_code(self, code: str) -> ExecutionResult:
@@ -117,7 +117,7 @@ class SandboxClient:
         try:
             execution = sandbox.run_code(code)
         except Exception as e:
-            logger.error("Code execution failed: %s", e)
+            logger.exception("Code execution failed: %s", e)
             return ExecutionResult(success=False, error=str(e))
 
         if execution.error:
@@ -150,7 +150,7 @@ class SandboxClient:
         try:
             result = sandbox.commands.run(command, timeout=timeout)
         except Exception as e:
-            logger.error("Bash command failed: %s", e)
+            logger.exception("Bash command failed: %s", e)
             return BashResult(success=False, error=str(e))
 
         return BashResult(
