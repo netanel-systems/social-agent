@@ -73,16 +73,20 @@ class SandboxClient:
         """Check if sandbox is currently active."""
         return self._sandbox is not None
 
+    # Packages required in the sandbox for HTTP operations.
+    _SANDBOX_PACKAGES = ("httpx",)
+
     def start(self) -> None:
         """Create the sandbox. Idempotent — safe to call multiple times."""
         if self._sandbox is not None:
             return
         logger.info("Creating E2B sandbox (timeout=%ds)", self._timeout)
-        self._sandbox = Sandbox(
+        self._sandbox = Sandbox.create(
             api_key=self._api_key.get_secret_value(),
             timeout=self._timeout,
         )
         logger.info("Sandbox created: %s", self._sandbox.sandbox_id)
+        self._install_packages()
 
     def stop(self) -> None:
         """Kill the sandbox and release resources."""
@@ -96,6 +100,32 @@ class SandboxClient:
         finally:
             self._sandbox = None
             logger.info("Sandbox stopped: %s", sandbox_id)
+
+    def _install_packages(self) -> None:
+        """Install required packages in the sandbox."""
+        if not self._sandbox or not self._SANDBOX_PACKAGES:
+            return
+        pkgs = " ".join(self._SANDBOX_PACKAGES)
+        logger.info("Installing sandbox packages: %s", pkgs)
+        pkg_args = ", ".join(repr(p) for p in self._SANDBOX_PACKAGES)
+        install_code = (
+            "import subprocess, sys; "
+            "subprocess.run("
+            f"[sys.executable, '-m', 'pip', 'install', '-q', {pkg_args}], "
+            "capture_output=True, check=True)"
+        )
+        try:
+            result = self._sandbox.run_code(install_code)
+            if result.error:
+                logger.warning(
+                    "Package install warning: %s: %s",
+                    result.error.name,
+                    result.error.value,
+                )
+            else:
+                logger.info("Sandbox packages installed")
+        except Exception:
+            logger.exception("Failed to install sandbox packages")
 
     def _ensure_sandbox(self) -> Sandbox:
         """Lazy init — create sandbox on first use."""

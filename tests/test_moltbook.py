@@ -105,6 +105,43 @@ def test_parse_response_invalid_json() -> None:
     assert "error" in result
 
 
+# --- check_status ---
+
+
+def test_check_status_claimed(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Returns claimed status when agent is verified."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 200,
+        "body": {"status": "claimed", "name": "NathanSystems"},
+    })
+    result = client.check_status()
+    assert result["status"] == "claimed"
+
+
+def test_check_status_pending(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Returns pending_claim status when not yet verified."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 200,
+        "body": {"status": "pending_claim"},
+    })
+    result = client.check_status()
+    assert result["status"] == "pending_claim"
+
+
+def test_check_status_sandbox_error(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Returns unknown status on sandbox error."""
+    mock_sandbox.execute_code.return_value = _sandbox_error("sandbox crashed")
+    result = client.check_status()
+    assert result["status"] == "unknown"
+    assert "error" in result
+
+
 # --- register ---
 
 
@@ -165,6 +202,22 @@ def test_get_feed_success(
     assert result.posts[0].title == "Hello"
     assert result.posts[0].upvotes == 5
     assert result.posts[0].submolt == "agents"
+
+
+def test_get_feed_global(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Global feed (no submolt) returns posts."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 200,
+        "body": [
+            {"id": "1", "title": "Hello", "body": "World", "author": "bot1"},
+        ],
+    })
+    result = client.get_feed(limit=5)
+    assert result.success is True
+    assert len(result.posts) == 1
+    assert result.posts[0].submolt == ""
 
 
 def test_get_feed_empty(

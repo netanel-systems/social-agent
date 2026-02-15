@@ -104,14 +104,14 @@ def test_client_not_running_initially(api_key: SecretStr) -> None:
 
 @patch("social_agent.sandbox.Sandbox")
 def test_start_creates_sandbox(mock_sandbox_cls: MagicMock, api_key: SecretStr) -> None:
-    """start() creates an E2B sandbox."""
-    mock_sandbox_cls.return_value = MagicMock(sandbox_id="sb-1")
+    """start() creates an E2B sandbox via Sandbox.create()."""
+    mock_sandbox_cls.create.return_value = MagicMock(sandbox_id="sb-1")
     client = SandboxClient(api_key=api_key, timeout=120)
 
     client.start()
 
     assert client.is_running is True
-    mock_sandbox_cls.assert_called_once_with(
+    mock_sandbox_cls.create.assert_called_once_with(
         api_key="e2b_test_key",
         timeout=120,
     )
@@ -120,20 +120,20 @@ def test_start_creates_sandbox(mock_sandbox_cls: MagicMock, api_key: SecretStr) 
 @patch("social_agent.sandbox.Sandbox")
 def test_start_idempotent(mock_sandbox_cls: MagicMock, api_key: SecretStr) -> None:
     """Calling start() twice doesn't create a second sandbox."""
-    mock_sandbox_cls.return_value = MagicMock(sandbox_id="sb-1")
+    mock_sandbox_cls.create.return_value = MagicMock(sandbox_id="sb-1")
     client = SandboxClient(api_key=api_key)
 
     client.start()
     client.start()
 
-    mock_sandbox_cls.assert_called_once()
+    mock_sandbox_cls.create.assert_called_once()
 
 
 @patch("social_agent.sandbox.Sandbox")
 def test_stop_kills_sandbox(mock_sandbox_cls: MagicMock, api_key: SecretStr) -> None:
     """stop() kills the sandbox and resets state."""
     mock_instance = MagicMock(sandbox_id="sb-1")
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
     client = SandboxClient(api_key=api_key)
 
     client.start()
@@ -157,7 +157,7 @@ def test_stop_without_start(api_key: SecretStr) -> None:
 def test_context_manager(mock_sandbox_cls: MagicMock, api_key: SecretStr) -> None:
     """Context manager starts and stops the sandbox."""
     mock_instance = MagicMock(sandbox_id="sb-1")
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     with SandboxClient(api_key=api_key) as client:
         assert client.is_running is True
@@ -181,7 +181,7 @@ def test_execute_code_success(
 
     mock_instance = MagicMock(sandbox_id="sb-1")
     mock_instance.run_code.return_value = mock_execution
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     client = SandboxClient(api_key=api_key)
     result = client.execute_code("print('hello')")
@@ -209,7 +209,7 @@ def test_execute_code_with_error(
 
     mock_instance = MagicMock(sandbox_id="sb-1")
     mock_instance.run_code.return_value = mock_execution
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     client = SandboxClient(api_key=api_key)
     result = client.execute_code("print(x)")
@@ -226,7 +226,7 @@ def test_execute_code_exception(
     """execute_code handles SDK exceptions gracefully."""
     mock_instance = MagicMock(sandbox_id="sb-1")
     mock_instance.run_code.side_effect = ConnectionError("network down")
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     client = SandboxClient(api_key=api_key)
     result = client.execute_code("1 + 1")
@@ -248,7 +248,7 @@ def test_run_bash_success(mock_sandbox_cls: MagicMock, api_key: SecretStr) -> No
 
     mock_instance = MagicMock(sandbox_id="sb-1")
     mock_instance.commands.run.return_value = mock_cmd_result
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     client = SandboxClient(api_key=api_key)
     result = client.run_bash("ls")
@@ -268,7 +268,7 @@ def test_run_bash_nonzero_exit(mock_sandbox_cls: MagicMock, api_key: SecretStr) 
 
     mock_instance = MagicMock(sandbox_id="sb-1")
     mock_instance.commands.run.return_value = mock_cmd_result
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     client = SandboxClient(api_key=api_key)
     result = client.run_bash("cat missing.txt")
@@ -283,7 +283,7 @@ def test_run_bash_exception(mock_sandbox_cls: MagicMock, api_key: SecretStr) -> 
     """run_bash handles SDK exceptions gracefully."""
     mock_instance = MagicMock(sandbox_id="sb-1")
     mock_instance.commands.run.side_effect = TimeoutError("timed out")
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     client = SandboxClient(api_key=api_key)
     result = client.run_bash("sleep 999")
@@ -306,14 +306,14 @@ def test_lazy_init_on_execute(mock_sandbox_cls: MagicMock, api_key: SecretStr) -
 
     mock_instance = MagicMock(sandbox_id="sb-1")
     mock_instance.run_code.return_value = mock_execution
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     client = SandboxClient(api_key=api_key)
     assert client.is_running is False
 
     client.execute_code("pass")
     assert client.is_running is True
-    mock_sandbox_cls.assert_called_once()
+    mock_sandbox_cls.create.assert_called_once()
 
 
 @patch("social_agent.sandbox.Sandbox")
@@ -326,7 +326,7 @@ def test_lazy_init_on_bash(mock_sandbox_cls: MagicMock, api_key: SecretStr) -> N
 
     mock_instance = MagicMock(sandbox_id="sb-1")
     mock_instance.commands.run.return_value = mock_cmd_result
-    mock_sandbox_cls.return_value = mock_instance
+    mock_sandbox_cls.create.return_value = mock_instance
 
     client = SandboxClient(api_key=api_key)
     assert client.is_running is False

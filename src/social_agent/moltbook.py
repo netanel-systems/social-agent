@@ -216,15 +216,44 @@ class MoltbookClient:
             )
         return RegisterResult(success=False, error=f"Unexpected response: {body}")
 
-    def get_feed(self, submolt: str, limit: int = 10) -> FeedResult:
-        """Read posts from a submolt.
+    def check_status(self) -> dict[str, Any]:
+        """Check agent claim status.
+
+        Returns:
+            Dict with 'status' key ('pending_claim' or 'claimed') and other info.
+        """
+        logger.info("Checking agent status")
+        resp = self._execute("get", "/agents/status")
+        if "error" in resp:
+            return {"status": "unknown", "error": resp["error"]}
+
+        status_code = resp.get("status", 0)
+        body = resp.get("body", {})
+
+        if status_code != 200:
+            return {"status": "unknown", "error": f"HTTP {status_code}: {body}"}
+        if isinstance(body, dict):
+            return body
+        return {"status": "unknown", "error": f"Unexpected response: {body}"}
+
+    _MAX_FEED_LIMIT = 50
+
+    def get_feed(self, submolt: str = "", limit: int = 10) -> FeedResult:
+        """Read posts from the global feed or a submolt.
 
         Args:
-            submolt: Submolt name (e.g. 'agents', 'aitools').
-            limit: Max posts to return.
+            submolt: Submolt name to filter by (empty for global feed).
+            limit: Max posts to return (clamped to 1-50).
         """
-        logger.info("Reading feed: %s (limit=%d)", submolt, limit)
-        resp = self._execute("get", f"/submolts/{submolt}/posts", params={"limit": limit})
+        limit = max(1, min(limit, self._MAX_FEED_LIMIT))
+        if submolt:
+            logger.info("Reading submolt feed: %s (limit=%d)", submolt, limit)
+            resp = self._execute(
+                "get", "/posts", params={"submolt": submolt, "sort": "new", "limit": limit}
+            )
+        else:
+            logger.info("Reading global feed (limit=%d)", limit)
+            resp = self._execute("get", "/posts", params={"sort": "new", "limit": limit})
 
         if "error" in resp:
             return FeedResult(success=False, error=resp["error"])
@@ -235,20 +264,41 @@ class MoltbookClient:
         if status != 200:
             return FeedResult(success=False, error=f"HTTP {status}: {body}")
 
+        # API returns {"posts": [...]} or a direct list
+        post_items: list[dict[str, Any]] = []
+        if isinstance(body, dict) and "posts" in body:
+            raw = body["posts"]
+            if isinstance(raw, list):
+                post_items = [p for p in raw if isinstance(p, dict)]
+        elif isinstance(body, list):
+            post_items = [p for p in body if isinstance(p, dict)]
+
         posts: list[MoltbookPost] = []
-        if isinstance(body, list):
-            for item in body:
-                if isinstance(item, dict):
-                    posts.append(MoltbookPost(
-                        id=str(item.get("id", "")),
-                        title=str(item.get("title", "")),
-                        body=str(item.get("body", "")),
-                        submolt=submolt,
-                        author=str(item.get("author", "")),
-                        upvotes=int(item.get("upvotes", 0)),
-                        comments_count=int(item.get("comments_count", 0)),
-                        created_at=str(item.get("created_at", "")),
-                    ))
+        for item in post_items:
+            # Author may be string or {"id": ..., "name": ...}
+            author_raw = item.get("author", "")
+            if isinstance(author_raw, dict):
+                author = str(author_raw.get("name", ""))
+            else:
+                author = str(author_raw)
+
+            # Submolt may be string or {"id": ..., "name": ...}
+            submolt_raw = item.get("submolt", submolt)
+            if isinstance(submolt_raw, dict):
+                post_submolt = str(submolt_raw.get("name", submolt))
+            else:
+                post_submolt = str(submolt_raw) if submolt_raw else submolt
+
+            posts.append(MoltbookPost(
+                id=str(item.get("id", "")),
+                title=str(item.get("title", "")),
+                body=str(item.get("content", item.get("body", ""))),
+                submolt=post_submolt,
+                author=author,
+                upvotes=int(item.get("upvotes", 0)),
+                comments_count=int(item.get("comment_count", 0)),
+                created_at=str(item.get("created_at", "")),
+            ))
 
         return FeedResult(posts=posts)
 
@@ -269,8 +319,8 @@ class MoltbookClient:
         logger.info("Creating post in %s: '%s'", submolt, title[:50])
         resp = self._execute(
             "post",
-            f"/submolts/{submolt}/posts",
-            body={"title": title, "body": body},
+            "/posts",
+            body={"title": title, "body": body, "submolt": submolt},
         )
 
         if "error" in resp:
@@ -335,15 +385,15 @@ class MoltbookClient:
         return EngagementResult(success=False, error=f"Unexpected response: {body}")
 
     def heartbeat(self) -> HeartbeatResult:
-        """Send heartbeat to keep agent active."""
+        """Send heartbeat by checking agent status."""
         logger.debug("Sending heartbeat")
-        resp = self._execute("post", "/agents/heartbeat")
+        resp = self._execute("get", "/agents/status")
 
         if "error" in resp:
             return HeartbeatResult(success=False, error=resp["error"])
 
         status = resp.get("status", 0)
-        if status not in (200, 204):
+        if status != 200:
             return HeartbeatResult(
                 success=False, error=f"HTTP {status}: {resp.get('body')}"
             )
