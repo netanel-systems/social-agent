@@ -256,34 +256,41 @@ class MoltbookClient:
         if status != 200:
             return FeedResult(success=False, error=f"HTTP {status}: {body}")
 
+        # API returns {"posts": [...]} or a direct list
+        post_items: list[dict[str, Any]] = []
+        if isinstance(body, dict) and "posts" in body:
+            raw = body["posts"]
+            if isinstance(raw, list):
+                post_items = [p for p in raw if isinstance(p, dict)]
+        elif isinstance(body, list):
+            post_items = [p for p in body if isinstance(p, dict)]
+
         posts: list[MoltbookPost] = []
-        if isinstance(body, list):
-            for item in body:
-                if isinstance(item, dict):
-                    # Author may be string or {"id": ..., "name": ...}
-                    author_raw = item.get("author", "")
-                    if isinstance(author_raw, dict):
-                        author = str(author_raw.get("name", ""))
-                    else:
-                        author = str(author_raw)
+        for item in post_items:
+            # Author may be string or {"id": ..., "name": ...}
+            author_raw = item.get("author", "")
+            if isinstance(author_raw, dict):
+                author = str(author_raw.get("name", ""))
+            else:
+                author = str(author_raw)
 
-                    # Submolt may be string or {"id": ..., "name": ...}
-                    submolt_raw = item.get("submolt", submolt)
-                    if isinstance(submolt_raw, dict):
-                        post_submolt = str(submolt_raw.get("name", submolt))
-                    else:
-                        post_submolt = str(submolt_raw) if submolt_raw else submolt
+            # Submolt may be string or {"id": ..., "name": ...}
+            submolt_raw = item.get("submolt", submolt)
+            if isinstance(submolt_raw, dict):
+                post_submolt = str(submolt_raw.get("name", submolt))
+            else:
+                post_submolt = str(submolt_raw) if submolt_raw else submolt
 
-                    posts.append(MoltbookPost(
-                        id=str(item.get("id", "")),
-                        title=str(item.get("title", "")),
-                        body=str(item.get("body", "")),
-                        submolt=post_submolt,
-                        author=author,
-                        upvotes=int(item.get("upvotes", 0)),
-                        comments_count=int(item.get("comments_count", 0)),
-                        created_at=str(item.get("created_at", "")),
-                    ))
+            posts.append(MoltbookPost(
+                id=str(item.get("id", "")),
+                title=str(item.get("title", "")),
+                body=str(item.get("content", item.get("body", ""))),
+                submolt=post_submolt,
+                author=author,
+                upvotes=int(item.get("upvotes", 0)),
+                comments_count=int(item.get("comment_count", 0)),
+                created_at=str(item.get("created_at", "")),
+            ))
 
         return FeedResult(posts=posts)
 
