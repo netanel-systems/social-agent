@@ -11,14 +11,20 @@ def test_all_namespaces_have_prompts() -> None:
         assert ns in PROMPTS, f"Missing prompt for namespace: {ns}"
 
 
-def test_four_namespaces() -> None:
-    """Architecture defines exactly 4 namespaces."""
-    assert len(NAMESPACES) == 4
+def test_five_namespaces() -> None:
+    """Architecture defines exactly 5 namespaces."""
+    assert len(NAMESPACES) == 5
 
 
 def test_expected_namespaces() -> None:
     """Namespace names match Architecture Section 4."""
-    expected = {"moltbook-decide", "moltbook-content", "moltbook-reply", "moltbook-analyze"}
+    expected = {
+        "moltbook-decide",
+        "moltbook-research",
+        "moltbook-content",
+        "moltbook-reply",
+        "moltbook-analyze",
+    }
     assert set(NAMESPACES) == expected
 
 

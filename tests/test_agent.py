@@ -113,12 +113,13 @@ def _feed_posts(count: int = 3) -> list[MoltbookPost]:
 
 
 def test_action_values() -> None:
-    """All 4 actions exist with correct values."""
+    """All 5 actions exist with correct values."""
     assert Action.READ_FEED == "READ_FEED"
+    assert Action.RESEARCH == "RESEARCH"
     assert Action.REPLY == "REPLY"
     assert Action.CREATE_POST == "CREATE_POST"
     assert Action.ANALYZE == "ANALYZE"
-    assert len(Action) == 4
+    assert len(Action) == 5
 
 
 # --- AgentState ---
@@ -750,3 +751,157 @@ def test_action_exception_caught(
     result = agent.cycle()
     assert result.success is False
     assert result.error is not None
+
+
+# --- RESEARCH ---
+
+
+def test_research_no_sandbox(agent: Agent) -> None:
+    """RESEARCH fails gracefully without a sandbox."""
+    # Default agent fixture has no sandbox
+    result = agent._act_research()
+    assert result.success is False
+    assert "No sandbox" in result.details
+
+
+def test_research_success(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """RESEARCH calls brain for query, runs sandbox search, stores context."""
+    from social_agent.sandbox import ExecutionResult
+
+    mock_sandbox = MagicMock()
+    mock_sandbox.execute_code.return_value = ExecutionResult(
+        stdout=['[{"title": "AI Agents 2026", "body": "New developments...", "url": "https://example.com"}]'],
+        success=True,
+    )
+    mock_brain.call.return_value = _brain_result(
+        "QUERY: AI agent frameworks 2026\nTOPIC: Agent Frameworks\nRATIONALE: Hot topic"
+    )
+
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        sandbox=mock_sandbox,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+
+    result = agent._act_research()
+    assert result.success is True
+    assert "AI agent frameworks 2026" in result.details
+    assert "AI Agents 2026" in agent._research_context
+    mock_sandbox.execute_code.assert_called_once()
+
+
+def test_research_empty_results(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """RESEARCH handles empty search results."""
+    from social_agent.sandbox import ExecutionResult
+
+    mock_sandbox = MagicMock()
+    mock_sandbox.execute_code.return_value = ExecutionResult(
+        stdout=["[]"], success=True,
+    )
+    mock_brain.call.return_value = _brain_result(
+        "QUERY: obscure topic nobody knows\nTOPIC: Unknown\nRATIONALE: test"
+    )
+
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        sandbox=mock_sandbox,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+
+    result = agent._act_research()
+    assert result.success is False
+    assert "No results" in result.details
+
+
+def test_research_sandbox_failure(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """RESEARCH handles sandbox execution failure."""
+    from social_agent.sandbox import ExecutionResult
+
+    mock_sandbox = MagicMock()
+    mock_sandbox.execute_code.return_value = ExecutionResult(
+        success=False, error="sandbox crashed",
+    )
+    mock_brain.call.return_value = _brain_result(
+        "QUERY: AI agents\nTOPIC: AI\nRATIONALE: test"
+    )
+
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        sandbox=mock_sandbox,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+
+    result = agent._act_research()
+    assert result.success is False
+
+
+def test_parse_research_query() -> None:
+    """Parse search query from brain response."""
+    query = Agent._parse_research_query(
+        "QUERY: AI agent frameworks 2026\nTOPIC: Agents\nRATIONALE: trending"
+    )
+    assert query == "AI agent frameworks 2026"
+
+
+def test_parse_research_query_fallback() -> None:
+    """Fallback to first line when no QUERY: prefix."""
+    query = Agent._parse_research_query("some random text about AI")
+    assert query == "some random text about AI"
+
+
+def test_research_context_in_decision(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Decision context includes research availability."""
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+
+    # No research
+    context = agent._build_decision_context()
+    assert "Research context available: NO" in context
+    assert "No research done" in context
+
+    # With research
+    agent._research_context = "Some research about AI agents"
+    context = agent._build_decision_context()
+    assert "Research context available: YES" in context

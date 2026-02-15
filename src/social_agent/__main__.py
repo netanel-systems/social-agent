@@ -71,6 +71,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         brain=brain,
         moltbook=moltbook,
         notifier=notifier,
+        sandbox=sandbox,
         state_path=Path("state.json"),
         activity_log_path=Path("logs/activity.jsonl"),
     )

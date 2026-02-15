@@ -320,7 +320,7 @@ class MoltbookClient:
         resp = self._execute(
             "post",
             "/posts",
-            body={"title": title, "body": body, "submolt": submolt},
+            body={"title": title, "content": body, "submolt": submolt},
         )
 
         if "error" in resp:
@@ -343,7 +343,7 @@ class MoltbookClient:
             body: Reply content.
         """
         logger.info("Replying to post %s", post_id)
-        resp = self._execute("post", f"/posts/{post_id}/comments", body={"body": body})
+        resp = self._execute("post", f"/posts/{post_id}/comments", body={"content": body})
 
         if "error" in resp:
             return PostResult(success=False, error=resp["error"])

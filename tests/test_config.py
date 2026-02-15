@@ -60,9 +60,9 @@ def test_missing_e2b_key(tmp_path: Path) -> None:
 
 
 def test_default_cycle_interval(required_env: dict[str, object]) -> None:
-    """Default cycle interval is 300 seconds."""
+    """Default cycle interval is 15 seconds (testing mode)."""
     settings = Settings(**required_env)  # type: ignore[arg-type]
-    assert settings.cycle_interval_seconds == 300
+    assert settings.cycle_interval_seconds == 15
 
 
 def test_default_max_posts(required_env: dict[str, object]) -> None:
@@ -136,15 +136,15 @@ def test_secrets_not_in_repr(required_env: dict[str, object]) -> None:
 
 
 def test_cycle_interval_too_low(required_env: dict[str, object]) -> None:
-    """Cycle interval below 60s raises ValidationError."""
+    """Cycle interval below minimum raises ValidationError."""
     with pytest.raises(ValidationError, match="cycle_interval_seconds"):
-        Settings(**required_env, cycle_interval_seconds=30)  # type: ignore[arg-type]
+        Settings(**required_env, cycle_interval_seconds=5)  # type: ignore[arg-type]
 
 
 def test_cycle_interval_at_minimum(required_env: dict[str, object]) -> None:
-    """Cycle interval at exactly 60s is valid."""
-    settings = Settings(**required_env, cycle_interval_seconds=60)  # type: ignore[arg-type]
-    assert settings.cycle_interval_seconds == 60
+    """Cycle interval at minimum is valid."""
+    settings = Settings(**required_env, cycle_interval_seconds=10)  # type: ignore[arg-type]
+    assert settings.cycle_interval_seconds == 10
 
 
 def test_quality_threshold_too_high(required_env: dict[str, object]) -> None:

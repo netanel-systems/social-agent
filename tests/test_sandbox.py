@@ -333,3 +333,104 @@ def test_lazy_init_on_bash(mock_sandbox_cls: MagicMock, api_key: SecretStr) -> N
 
     client.run_bash("echo hi")
     assert client.is_running is True
+
+
+# --- Auto-recovery on sandbox timeout ---
+
+
+@patch("social_agent.sandbox.Sandbox")
+def test_execute_code_recovers_from_timeout(
+    mock_sandbox_cls: MagicMock, api_key: SecretStr
+) -> None:
+    """execute_code creates a new sandbox when the old one expires."""
+    from e2b.exceptions import TimeoutException
+
+    # First sandbox expires
+    expired = MagicMock(sandbox_id="sb-old")
+    expired.run_code.side_effect = TimeoutException(
+        '{"message":"The sandbox was not found","code":502}'
+    )
+
+    # Recovery sandbox works
+    mock_execution = MagicMock()
+    mock_execution.error = None
+    mock_execution.logs.stdout = ["ok"]
+    mock_execution.logs.stderr = []
+    mock_execution.text = "ok"
+
+    fresh = MagicMock(sandbox_id="sb-new")
+    fresh.run_code.return_value = mock_execution
+
+    mock_sandbox_cls.create.side_effect = [expired, fresh]
+
+    client = SandboxClient(api_key=api_key)
+    result = client.execute_code("print('ok')")
+
+    assert result.success is True
+    assert result.stdout == ["ok"]
+    assert mock_sandbox_cls.create.call_count == 2
+
+
+@patch("social_agent.sandbox.Sandbox")
+def test_run_bash_recovers_from_timeout(
+    mock_sandbox_cls: MagicMock, api_key: SecretStr
+) -> None:
+    """run_bash creates a new sandbox when the old one expires."""
+    from e2b.exceptions import TimeoutException
+
+    # First sandbox expires
+    expired = MagicMock(sandbox_id="sb-old")
+    expired.commands.run.side_effect = TimeoutException(
+        '{"message":"The sandbox was not found","code":502}'
+    )
+
+    # Recovery sandbox works
+    mock_cmd_result = MagicMock()
+    mock_cmd_result.stdout = "hi"
+    mock_cmd_result.stderr = ""
+    mock_cmd_result.exit_code = 0
+
+    fresh = MagicMock(sandbox_id="sb-new")
+    fresh.commands.run.return_value = mock_cmd_result
+
+    mock_sandbox_cls.create.side_effect = [expired, fresh]
+
+    client = SandboxClient(api_key=api_key)
+    result = client.run_bash("echo hi")
+
+    assert result.success is True
+    assert result.stdout == "hi"
+    assert mock_sandbox_cls.create.call_count == 2
+
+
+@patch("social_agent.sandbox.Sandbox")
+def test_execute_code_no_recovery_on_other_errors(
+    mock_sandbox_cls: MagicMock, api_key: SecretStr
+) -> None:
+    """execute_code does NOT retry on non-timeout exceptions."""
+    mock_instance = MagicMock(sandbox_id="sb-1")
+    mock_instance.run_code.side_effect = ConnectionError("network down")
+    mock_sandbox_cls.create.return_value = mock_instance
+
+    client = SandboxClient(api_key=api_key)
+    result = client.execute_code("1 + 1")
+
+    assert result.success is False
+    assert "network down" in (result.error or "")
+    # Only one sandbox created — no recovery attempted
+    mock_sandbox_cls.create.assert_called_once()
+
+
+def test_is_sandbox_expired() -> None:
+    """_is_sandbox_expired detects timeout messages correctly."""
+    from e2b.exceptions import TimeoutException
+
+    assert SandboxClient._is_sandbox_expired(
+        TimeoutException('{"message":"The sandbox was not found","code":502}')
+    )
+    assert SandboxClient._is_sandbox_expired(
+        TimeoutException("sandbox timeout error")
+    )
+    assert not SandboxClient._is_sandbox_expired(
+        ConnectionError("network down")
+    )

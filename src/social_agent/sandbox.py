@@ -74,7 +74,7 @@ class SandboxClient:
         return self._sandbox is not None
 
     # Packages required in the sandbox for HTTP operations.
-    _SANDBOX_PACKAGES = ("httpx",)
+    _SANDBOX_PACKAGES = ("httpx", "duckduckgo-search")
 
     def start(self) -> None:
         """Create the sandbox. Idempotent — safe to call multiple times."""
@@ -127,6 +127,9 @@ class SandboxClient:
         except Exception:
             logger.exception("Failed to install sandbox packages")
 
+    # Max automatic retries when sandbox expires mid-session.
+    _MAX_RECOVERY_RETRIES = 1
+
     def _ensure_sandbox(self) -> Sandbox:
         """Lazy init — create sandbox on first use."""
         if self._sandbox is None:
@@ -134,8 +137,23 @@ class SandboxClient:
         assert self._sandbox is not None
         return self._sandbox
 
+    @staticmethod
+    def _is_sandbox_expired(error: Exception) -> bool:
+        """Check if an exception indicates the sandbox timed out."""
+        msg = str(error).lower()
+        return "sandbox was not found" in msg or "sandbox timeout" in msg
+
+    def _recover_sandbox(self) -> Sandbox:
+        """Kill stale reference and create a fresh sandbox."""
+        logger.warning("Sandbox expired — creating a new one")
+        self._sandbox = None
+        return self._ensure_sandbox()
+
     def execute_code(self, code: str) -> ExecutionResult:
         """Execute Python code in the sandbox.
+
+        Auto-recovers if the sandbox has expired (timeout). Creates a new
+        sandbox and retries once before reporting failure.
 
         Args:
             code: Python code to execute.
@@ -144,11 +162,16 @@ class SandboxClient:
             ExecutionResult with stdout, stderr, text output, and success flag.
         """
         sandbox = self._ensure_sandbox()
-        try:
-            execution = sandbox.run_code(code)
-        except Exception as e:
-            logger.exception("Code execution failed: %s", e)
-            return ExecutionResult(success=False, error=str(e))
+        for attempt in range(self._MAX_RECOVERY_RETRIES + 1):
+            try:
+                execution = sandbox.run_code(code)
+                break
+            except Exception as e:
+                if attempt < self._MAX_RECOVERY_RETRIES and self._is_sandbox_expired(e):
+                    sandbox = self._recover_sandbox()
+                    continue
+                logger.exception("Code execution failed: %s", e)
+                return ExecutionResult(success=False, error=str(e))
 
         if execution.error:
             return ExecutionResult(
@@ -169,6 +192,9 @@ class SandboxClient:
     def run_bash(self, command: str, timeout: float = 60) -> BashResult:
         """Run a bash command in the sandbox.
 
+        Auto-recovers if the sandbox has expired (timeout). Creates a new
+        sandbox and retries once before reporting failure.
+
         Args:
             command: Shell command to execute.
             timeout: Maximum seconds to wait (default 60).
@@ -177,11 +203,16 @@ class SandboxClient:
             BashResult with stdout, stderr, exit code, and success flag.
         """
         sandbox = self._ensure_sandbox()
-        try:
-            result = sandbox.commands.run(command, timeout=timeout)
-        except Exception as e:
-            logger.exception("Bash command failed: %s", e)
-            return BashResult(success=False, error=str(e))
+        for attempt in range(self._MAX_RECOVERY_RETRIES + 1):
+            try:
+                result = sandbox.commands.run(command, timeout=timeout)
+                break
+            except Exception as e:
+                if attempt < self._MAX_RECOVERY_RETRIES and self._is_sandbox_expired(e):
+                    sandbox = self._recover_sandbox()
+                    continue
+                logger.exception("Bash command failed: %s", e)
+                return BashResult(success=False, error=str(e))
 
         return BashResult(
             stdout=result.stdout,

@@ -13,13 +13,13 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # --- Defaults (Architecture Section 6) ---
-_DEFAULT_CYCLE_INTERVAL = 300  # 5 minutes
+_DEFAULT_CYCLE_INTERVAL = 15  # 15 seconds (testing mode)
 _DEFAULT_MAX_POSTS = 5
 _DEFAULT_MAX_REPLIES = 20
 _DEFAULT_MAX_CYCLES = 500
 _DEFAULT_QUALITY_THRESHOLD = 0.7
 _DEFAULT_CIRCUIT_BREAKER = 5
-_MIN_CYCLE_INTERVAL = 60  # 1 minute floor
+_MIN_CYCLE_INTERVAL = 10  # 10 second floor (testing)
 
 
 class Settings(BaseSettings):

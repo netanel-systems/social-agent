@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from social_agent.brain import AgentBrain
     from social_agent.config import Settings
     from social_agent.moltbook import MoltbookClient, MoltbookPost
+    from social_agent.sandbox import SandboxClient
     from social_agent.telegram import TelegramNotifier
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class Action(StrEnum):
     """Agent actions from the state machine (Architecture Section 3)."""
 
     READ_FEED = "READ_FEED"
+    RESEARCH = "RESEARCH"
     REPLY = "REPLY"
     CREATE_POST = "CREATE_POST"
     ANALYZE = "ANALYZE"
@@ -156,6 +158,7 @@ class Agent:
         moltbook: MoltbookClient,
         notifier: TelegramNotifier,
         *,
+        sandbox: SandboxClient | None = None,
         state_path: Path | None = None,
         activity_log_path: Path | None = None,
     ) -> None:
@@ -165,11 +168,13 @@ class Agent:
         self._brain = brain
         self._moltbook = moltbook
         self._notifier = notifier
+        self._sandbox = sandbox
         self._state_path = state_path or _Path("state.json")
         self._activity_log_path = activity_log_path or _Path("logs/activity.jsonl")
         self._state = AgentState.load(self._state_path)
         self._shutdown_requested = False
         self._recent_feed: list[MoltbookPost] = []
+        self._research_context: str = ""
 
         self._activity_log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -304,6 +309,7 @@ class Agent:
             f"Posts today: {self._state.posts_today}/{self._settings.max_posts_per_day}",
             f"Replies today: {self._state.replies_today}/{self._settings.max_replies_per_day}",
             f"Feed posts loaded: {len(self._recent_feed)}",
+            f"Research context available: {'YES' if self._research_context else 'NO'}",
         ]
         if self._state.posts_today >= self._settings.max_posts_per_day:
             parts.append("CONSTRAINT: Daily post limit reached. Cannot CREATE_POST.")
@@ -311,6 +317,8 @@ class Agent:
             parts.append("CONSTRAINT: Daily reply limit reached. Cannot REPLY.")
         if not self._recent_feed:
             parts.append("NOTE: No feed loaded yet. Consider READ_FEED first.")
+        if not self._research_context:
+            parts.append("NOTE: No research done yet. Consider RESEARCH before CREATE_POST.")
         return "\n".join(parts)
 
     # --- Action handlers ---
@@ -321,6 +329,7 @@ class Agent:
         """Dispatch to the correct action handler."""
         handlers: dict[Action, Callable[[], CycleResult]] = {
             Action.READ_FEED: self._act_read_feed,
+            Action.RESEARCH: self._act_research,
             Action.REPLY: self._act_reply,
             Action.CREATE_POST: self._act_create_post,
             Action.ANALYZE: self._act_analyze,
@@ -358,6 +367,115 @@ class Agent:
         self._notify(details, "info")
         return CycleResult(action="READ_FEED", success=True, details=details)
 
+    # Max search results and snippet length for research.
+    _MAX_SEARCH_RESULTS = 5
+    _MAX_SNIPPET_LENGTH = 500
+
+    def _act_research(self) -> CycleResult:
+        """Research a topic using web search in the sandbox."""
+        if self._sandbox is None:
+            details = "No sandbox available for research"
+            self._log_activity("RESEARCH", success=False, details=details)
+            return CycleResult(action="RESEARCH", success=False, details=details)
+
+        # Ask brain for a search query
+        feed_topics = ""
+        if self._recent_feed:
+            feed_topics = "\n".join(f"- {p.title}" for p in self._recent_feed[:5])
+        context = "Generate a research query."
+        if feed_topics:
+            context += f"\n\nRecent feed topics:\n{feed_topics}"
+        if self._research_context:
+            context += f"\n\nPrevious research (avoid duplicates):\n{self._research_context[:200]}"
+
+        result = self._brain.call("moltbook-research", context)
+        query = self._parse_research_query(result.response)
+        if not query:
+            details = "Could not parse search query from brain"
+            self._log_activity("RESEARCH", success=False, details=details)
+            return CycleResult(action="RESEARCH", success=False, details=details)
+
+        # Run web search in sandbox
+        search_results = self._sandbox_web_search(query)
+        if not search_results:
+            details = f"No results for: {query}"
+            self._log_activity("RESEARCH", success=False, details=details)
+            return CycleResult(action="RESEARCH", success=False, details=details)
+
+        # Store research context for future posts/replies
+        self._research_context = (
+            f"Research on: {query}\n\n"
+            + "\n\n".join(
+                f"**{r['title']}**\n{r['body'][:self._MAX_SNIPPET_LENGTH]}"
+                for r in search_results
+            )
+        )
+
+        details = f"Researched: {query} ({len(search_results)} results)"
+        self._log_activity(
+            "RESEARCH", success=True, quality_score=result.score, details=details
+        )
+        self._notify(details, "info")
+        return CycleResult(
+            action="RESEARCH",
+            success=True,
+            quality_score=result.score,
+            details=details,
+        )
+
+    @staticmethod
+    def _parse_research_query(response: str) -> str:
+        """Extract search query from brain's research response."""
+        for line in response.strip().splitlines():
+            stripped = line.strip()
+            if stripped.upper().startswith("QUERY:"):
+                return stripped.split(":", 1)[1].strip().strip('"')
+        # Fallback: use first non-empty line
+        for line in response.strip().splitlines():
+            if line.strip():
+                return line.strip()[:100]
+        return ""
+
+    def _sandbox_web_search(self, query: str) -> list[dict[str, str]]:
+        """Run a DuckDuckGo search inside the E2B sandbox.
+
+        Returns list of dicts with 'title', 'body', 'url' keys.
+        Bounded to _MAX_SEARCH_RESULTS. All execution in sandbox.
+        """
+        if self._sandbox is None:
+            return []
+
+        # Build search code — safe: query is embedded as repr()
+        search_code = (
+            "from duckduckgo_search import DDGS\n"
+            "import json\n"
+            "results = []\n"
+            "try:\n"
+            "    with DDGS() as ddgs:\n"
+            f"        for r in ddgs.text({query!r}, max_results={self._MAX_SEARCH_RESULTS}):\n"
+            "            results.append({\n"
+            '                "title": r.get("title", ""),\n'
+            '                "body": r.get("body", ""),\n'
+            '                "url": r.get("href", ""),\n'
+            "            })\n"
+            "except Exception as e:\n"
+            '    results = [{"title": "Search error", "body": str(e), "url": ""}]\n'
+            "print(json.dumps(results))\n"
+        )
+
+        result = self._sandbox.execute_code(search_code)
+        if not result.success or not result.stdout:
+            logger.warning("Sandbox search failed: %s", result.error)
+            return []
+
+        try:
+            parsed = json.loads(result.stdout[-1])
+            if isinstance(parsed, list):
+                return parsed  # type: ignore[return-value]
+        except (json.JSONDecodeError, IndexError):
+            logger.warning("Could not parse search results")
+        return []
+
     def _act_create_post(self) -> CycleResult:
         """Generate and publish an original post."""
         if self._state.posts_today >= self._settings.max_posts_per_day:
@@ -367,6 +485,8 @@ class Agent:
 
         # Generate content via brain
         context = "Write an original post about AI agents or technology."
+        if self._research_context:
+            context += f"\n\nResearch context:\n{self._research_context}"
         if self._recent_feed:
             trending = "\n".join(f"- {p.title}" for p in self._recent_feed[:5])
             context += f"\n\nTrending topics:\n{trending}"
@@ -445,6 +565,8 @@ class Agent:
             f"Body: {post.body}\n"
             f"Upvotes: {post.upvotes}"
         )
+        if self._research_context:
+            context += f"\n\nResearch context (use if relevant):\n{self._research_context}"
 
         result = self._brain.call("moltbook-reply", context)
 
