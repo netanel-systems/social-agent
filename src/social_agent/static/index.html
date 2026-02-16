@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nathan — Live Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Status bar -->
+    <header id="status-bar">
+        <div class="status-left">
+            <span id="health-dot" class="dot dot-unknown" title="Unknown"></span>
+            <span id="health-text">Connecting...</span>
+        </div>
+        <div class="status-center">
+            <strong>Nathan</strong> — Autonomous Agent Dashboard
+        </div>
+        <div class="status-right">
+            <span id="sandbox-id">—</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Statistics panel -->
+        <section id="stats-panel" class="panel">
+            <h2>Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-cycles">—</span>
+                    <span class="stat-label">Cycles</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-success-rate">—</span>
+                    <span class="stat-label">Success Rate</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-quality">—</span>
+                    <span class="stat-label">Avg Quality</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-posts">—</span>
+                    <span class="stat-label">Posts Today</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-replies">—</span>
+                    <span class="stat-label">Replies Today</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-actions">—</span>
+                    <span class="stat-label">Total Actions</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Heartbeat panel -->
+        <section id="heartbeat-panel" class="panel">
+            <h2>Heartbeat</h2>
+            <div class="heartbeat-grid">
+                <div class="heartbeat-item">
+                    <span class="heartbeat-label">Status</span>
+                    <span class="heartbeat-value" id="hb-status">—</span>
+                </div>
+                <div class="heartbeat-item">
+                    <span class="heartbeat-label">Current Action</span>
+                    <span class="heartbeat-value" id="hb-action">—</span>
+                </div>
+                <div class="heartbeat-item">
+                    <span class="heartbeat-label">Last Heartbeat</span>
+                    <span class="heartbeat-value" id="hb-time">—</span>
+                </div>
+                <div class="heartbeat-item">
+                    <span class="heartbeat-label">Seconds Ago</span>
+                    <span class="heartbeat-value" id="hb-seconds">—</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Activity feed -->
+        <section id="activity-panel" class="panel">
+            <h2>Recent Activity</h2>
+            <div id="activity-feed" class="feed">
+                <p class="feed-empty">Waiting for data...</p>
+            </div>
+        </section>
+
+        <!-- Admin panel -->
+        <section id="admin-panel" class="panel panel-admin">
+            <h2>Admin Controls</h2>
+            <div id="admin-auth">
+                <label for="admin-token">Dashboard Token</label>
+                <input type="password" id="admin-token" placeholder="Enter DASHBOARD_TOKEN">
+                <button id="btn-auth" onclick="Dashboard.authenticate()">Authenticate</button>
+            </div>
+            <div id="admin-controls" class="hidden">
+                <div class="admin-section">
+                    <h3>Kill Switch</h3>
+                    <p>Immediately terminate the agent sandbox.</p>
+                    <button id="btn-kill" class="btn-danger" onclick="Dashboard.kill()">
+                        Kill Agent
+                    </button>
+                </div>
+                <div class="admin-section">
+                    <h3>Inject Rule</h3>
+                    <p>Add a rule to the agent's governance.</p>
+                    <input type="text" id="rule-input" placeholder="e.g. Never post after midnight">
+                    <button id="btn-inject" onclick="Dashboard.injectRule()">Inject</button>
+                </div>
+                <div id="admin-result" class="hidden"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>
+            <strong>Netanel Systems</strong> — Gift of God
+            <span class="separator">|</span>
+            Auto-refresh: <span id="refresh-interval">5</span>s
+            <span class="separator">|</span>
+            <span id="last-updated">—</span>
+        </p>
+    </footer>
+
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

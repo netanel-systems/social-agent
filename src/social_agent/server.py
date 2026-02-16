@@ -16,17 +16,22 @@ from __future__ import annotations
 
 import json
 import logging
+import mimetypes
 import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path as _PathLib
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
+
+from social_agent.control import SandboxController
+from social_agent.dashboard import build_dashboard, compute_action_stats, load_activity_log
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-from social_agent.control import SandboxController
-from social_agent.dashboard import build_dashboard, compute_action_stats, load_activity_log
+# Resolve the static files directory at import time.
+_STATIC_DIR = _PathLib(__file__).parent / "static"
 
 logger = logging.getLogger("social_agent.server")
 
@@ -57,10 +62,11 @@ class _RequestHandler(BaseHTTPRequestHandler):
         logger.debug(format, *args)
 
     def do_GET(self) -> None:  # noqa: N802
-        """Handle GET requests."""
+        """Handle GET requests — API routes, static files, and index."""
         parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/")
+        path = parsed.path.rstrip("/") or "/"
 
+        # API routes
         routes: dict[str, Any] = {
             "/api/status": self._handle_status,
             "/api/activity": self._handle_activity,
@@ -69,10 +75,22 @@ class _RequestHandler(BaseHTTPRequestHandler):
         }
 
         handler = routes.get(path)
-        if handler is None:
-            self._send_json({"error": "Not found"}, status=404)
+        if handler is not None:
+            handler()
             return
-        handler()
+
+        # Index page
+        if path == "/":
+            self._serve_static_file("index.html")
+            return
+
+        # Static files: /static/<filename>
+        if path.startswith("/static/"):
+            filename = path[len("/static/"):]
+            self._serve_static_file(filename)
+            return
+
+        self._send_json({"error": "Not found"}, status=404)
 
     def do_POST(self) -> None:  # noqa: N802
         """Handle POST requests (admin actions)."""
@@ -227,6 +245,50 @@ class _RequestHandler(BaseHTTPRequestHandler):
             "rule": rule,
             "sandbox_id": self.sandbox_id,
         })
+
+    # --- Static files ---
+
+    def _serve_static_file(self, filename: str) -> None:
+        """Serve a file from the static/ directory.
+
+        Security: only serves files directly inside _STATIC_DIR.
+        Path traversal (../) is blocked by resolving and checking
+        that the result is still within the static directory.
+        """
+        # Reject path traversal attempts
+        if ".." in filename or filename.startswith("/"):
+            self._send_json({"error": "Not found"}, status=404)
+            return
+
+        file_path = (_STATIC_DIR / filename).resolve()
+
+        # Ensure the resolved path is still inside _STATIC_DIR
+        if not str(file_path).startswith(str(_STATIC_DIR.resolve())):
+            self._send_json({"error": "Not found"}, status=404)
+            return
+
+        if not file_path.is_file():
+            self._send_json({"error": "Not found"}, status=404)
+            return
+
+        content_type, _ = mimetypes.guess_type(str(file_path))
+        if content_type is None:
+            content_type = "application/octet-stream"
+
+        try:
+            body = file_path.read_bytes()
+        except OSError:
+            self._send_json({"error": "Internal server error"}, status=500)
+            return
+
+        self.send_response(200)
+        self._send_cors_headers()
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        # Cache static assets for 5 minutes (browser refresh friendly)
+        self.send_header("Cache-Control", "public, max-age=300")
+        self.end_headers()
+        self.wfile.write(body)
 
     # --- Helpers ---
 
