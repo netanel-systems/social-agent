@@ -38,6 +38,7 @@ Step 7: Heartbeat + Stuck Detection              ✅ (7 tests)
 Step 8: Dashboard API Server (server.py)         ✅ (23 tests)
 Step 9: Public Dashboard Frontend (static/)      ✅ (6 tests)
 Step 10: Git Persistence Layer (git_sync.py)     ✅ (28 tests)
+Step 11: Cost Tracking (cost.py)                 ✅ (33 tests)
 ```
 
 ## File Structure
@@ -56,6 +57,7 @@ social-agent/
 │   ├── control.py       # External control plane (kill, observe)
 │   ├── server.py        # Dashboard API server (REST + static)
 │   ├── git_sync.py      # Background git persistence to nathan-brain
+│   ├── cost.py          # LLM + E2B cost tracking with budget enforcement
 │   └── static/          # Dashboard frontend (HTML/CSS/JS)
 │       ├── index.html
 │       ├── style.css
