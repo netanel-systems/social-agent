@@ -656,12 +656,18 @@ class Agent:
         External control reads this to determine HEALTHY/STUCK/DEAD status.
         See ARCHITECTURE.md Section 7.3.
         """
+        # Use live sandbox_id when available (forward-compatible with migration)
+        sandbox_id = (
+            self._sandbox.sandbox_id
+            if self._sandbox is not None
+            else self._sandbox_id
+        )
         heartbeat = {
             "timestamp": datetime.now(tz=UTC).isoformat(),
             "current_action": current_action,
             "action_started_at": datetime.now(tz=UTC).isoformat(),
             "cycle_count": self._state.cycle_count,
-            "sandbox_id": self._sandbox_id,
+            "sandbox_id": sandbox_id,
         }
         try:
             self._heartbeat_path.write_text(json.dumps(heartbeat, indent=2))

@@ -100,8 +100,8 @@ def cmd_run(args: argparse.Namespace) -> None:
             )
             if shutdown_requested:
                 agent.request_shutdown()
-            signal.signal(signal.SIGINT, lambda s, f: agent.request_shutdown())
-            signal.signal(signal.SIGTERM, lambda s, f: agent.request_shutdown())
+            signal.signal(signal.SIGINT, lambda *_: agent.request_shutdown())
+            signal.signal(signal.SIGTERM, lambda *_: agent.request_shutdown())
             agent.run()
     finally:
         logger.info("Agent stopped. Final state saved.")
