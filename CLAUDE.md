@@ -39,6 +39,7 @@ Step 8: Dashboard API Server (server.py)         ✅ (23 tests)
 Step 9: Public Dashboard Frontend (static/)      ✅ (6 tests)
 Step 10: Git Persistence Layer (git_sync.py)     ✅ (28 tests)
 Step 11: Cost Tracking (cost.py)                 ✅ (33 tests)
+Step 12: Lifecycle Tools (lifecycle.py)          ✅ (29 tests)
 ```
 
 ## File Structure
@@ -58,6 +59,7 @@ social-agent/
 │   ├── server.py        # Dashboard API server (REST + static)
 │   ├── git_sync.py      # Background git persistence to nathan-brain
 │   ├── cost.py          # LLM + E2B cost tracking with budget enforcement
+│   ├── lifecycle.py     # Sandbox self-migration + orphan cleanup
 │   └── static/          # Dashboard frontend (HTML/CSS/JS)
 │       ├── index.html
 │       ├── style.css
