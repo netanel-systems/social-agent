@@ -23,6 +23,7 @@ from .moltbook import (
 )
 from .prompts import NAMESPACES, PROMPTS
 from .sandbox import BashResult, ExecutionResult, SandboxClient
+from .server import DashboardServer
 from .telegram import Level, TelegramNotifier
 
 __all__ = [
@@ -54,6 +55,7 @@ __all__ = [
     "SandboxInfo",
     "Settings",
     "TelegramNotifier",
+    "DashboardServer",
     "build_dashboard",
     "compute_action_stats",
     "format_dashboard",
