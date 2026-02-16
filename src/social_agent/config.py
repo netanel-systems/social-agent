@@ -148,6 +148,9 @@ class Settings(BaseSettings):
         if self.executor_mode == ExecutorMode.SANDBOX and self.e2b_api_key is None:
             msg = "e2b_api_key is required when executor_mode='sandbox'"
             raise ValueError(msg)
+        if self.executor_mode == ExecutorMode.LOCAL and not detect_e2b_environment():
+            msg = "executor_mode='local' is only allowed inside an E2B sandbox"
+            raise ValueError(msg)
         self.memories_dir.mkdir(parents=True, exist_ok=True)
         return self
 

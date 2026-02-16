@@ -166,7 +166,7 @@ def _collect_memory_files() -> list[tuple[str, str]]:
     if _MEMORIES_DIR.exists():
         for mem_file in sorted(_MEMORIES_DIR.rglob("*")):
             if mem_file.is_file():
-                rel = mem_file.relative_to(_MEMORIES_DIR)
+                rel = mem_file.relative_to(_MEMORIES_DIR).as_posix()
                 remote = f"{_SANDBOX_WORKING_DIR}/memories/{rel}"
                 try:
                     files.append((remote, mem_file.read_text()))
@@ -330,19 +330,26 @@ def deploy_and_run(*, verbose: bool = False) -> None:
         )
         logger.info("Background result: %s", result.stdout.strip())
 
-        # Stream logs
-        logger.info("Streaming agent output (Ctrl+C to disconnect)...")
-        while True:
+        # Stream logs (bounded: max 10 minutes, then disconnect)
+        max_stream_seconds = 600
+        start_time = time.monotonic()
+        logger.info(
+            "Streaming agent output (Ctrl+C to disconnect, auto-stop after %ds)...",
+            max_stream_seconds,
+        )
+        while time.monotonic() - start_time < max_stream_seconds:
             try:
                 log_result = sandbox.commands.run(
                     "tail -n 50 /tmp/agent.log 2>/dev/null || echo 'Waiting for logs...'",
                     timeout=10,
                 )
                 if log_result.stdout.strip():
-                    print(log_result.stdout)  # noqa: T201
+                    print(log_result.stdout)
                 time.sleep(5)
             except KeyboardInterrupt:
                 break
+        else:
+            logger.info("Stopped log streaming after %ds", max_stream_seconds)
 
     except KeyboardInterrupt:
         logger.info("\nDisconnected from sandbox. Agent continues running.")
@@ -367,7 +374,10 @@ def download_state(*, api_key: str | None = None) -> None:
         logger.error("No saved sandbox state. Run deploy first.")
         return
 
-    sandbox_id = saved_state["sandbox_id"]
+    sandbox_id = saved_state.get("sandbox_id")
+    if not sandbox_id:
+        logger.error("Saved sandbox state missing sandbox_id — corrupted state file")
+        return
     logger.info("Connecting to sandbox: %s", sandbox_id)
 
     try:

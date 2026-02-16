@@ -112,6 +112,7 @@ class LocalExecutor:
         if not self._started:
             self.start()
 
+        tmp_path: str | None = None
         try:
             # Write code to temp file for clean execution
             with tempfile.NamedTemporaryFile(
@@ -129,9 +130,6 @@ class LocalExecutor:
                 text=True,
                 timeout=60,
             )
-
-            # Clean up temp file
-            Path(tmp_path).unlink(missing_ok=True)
 
             stdout_lines = result.stdout.splitlines() if result.stdout else []
             stderr_lines = result.stderr.splitlines() if result.stderr else []
@@ -157,14 +155,16 @@ class LocalExecutor:
             )
 
         except subprocess.TimeoutExpired:
-            Path(tmp_path).unlink(missing_ok=True)
             return ExecutionResult(
                 success=False,
                 error="Code execution timed out (60s)",
             )
-        except Exception as e:
-            logger.exception("Code execution failed: %s", e)
-            return ExecutionResult(success=False, error=str(e))
+        except Exception:
+            logger.exception("Code execution failed")
+            return ExecutionResult(success=False, error="Code execution failed")
+        finally:
+            if tmp_path:
+                Path(tmp_path).unlink(missing_ok=True)
 
     def run_bash(self, command: str, timeout: float = 60) -> BashResult:
         """Run a bash command locally.

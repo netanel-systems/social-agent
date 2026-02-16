@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import ValidationError
 
+from unittest.mock import patch
+
 from social_agent.config import ExecutorMode, Settings, get_settings
 
 if TYPE_CHECKING:
@@ -61,8 +63,9 @@ def test_missing_e2b_key_sandbox_mode(tmp_path: Path) -> None:
         )  # type: ignore[call-arg]
 
 
-def test_missing_e2b_key_local_mode(tmp_path: Path) -> None:
-    """Missing e2b_api_key in local mode is fine."""
+@patch("social_agent.config.detect_e2b_environment", return_value=True)
+def test_missing_e2b_key_local_mode(_mock_detect: object, tmp_path: Path) -> None:
+    """Missing e2b_api_key in local mode is fine (inside E2B)."""
     settings = Settings(
         _env_file=None,
         openai_api_key="sk-test",
@@ -257,8 +260,9 @@ def test_default_executor_mode(required_env: dict[str, object]) -> None:
     assert settings.executor_mode == ExecutorMode.SANDBOX
 
 
-def test_local_executor_mode(tmp_path: Path) -> None:
-    """Local executor mode works without E2B key."""
+@patch("social_agent.config.detect_e2b_environment", return_value=True)
+def test_local_executor_mode(_mock_detect: object, tmp_path: Path) -> None:
+    """Local executor mode works without E2B key (inside E2B)."""
     settings = Settings(
         _env_file=None,
         openai_api_key="sk-test",
@@ -267,6 +271,18 @@ def test_local_executor_mode(tmp_path: Path) -> None:
     )  # type: ignore[call-arg]
     assert settings.executor_mode == ExecutorMode.LOCAL
     assert settings.e2b_api_key is None
+
+
+@patch("social_agent.config.detect_e2b_environment", return_value=False)
+def test_local_mode_rejected_outside_e2b(_mock_detect: object, tmp_path: Path) -> None:
+    """Local executor mode is rejected outside E2B sandbox."""
+    with pytest.raises(ValidationError, match="only allowed inside an E2B sandbox"):
+        Settings(
+            _env_file=None,
+            openai_api_key="sk-test",
+            executor_mode="local",
+            memories_dir=tmp_path / "mem",
+        )  # type: ignore[call-arg]
 
 
 def test_sandbox_mode_requires_e2b_key(tmp_path: Path) -> None:
