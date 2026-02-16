@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr | None = None
     telegram_chat_id: str | None = None
 
+    # --- Dashboard (optional) ---
+    dashboard_token: SecretStr | None = None
+
     # --- LangSmith (optional, auto-enabled via env vars) ---
     langsmith_tracing: bool = Field(default=False)
     langsmith_api_key: SecretStr | None = None
