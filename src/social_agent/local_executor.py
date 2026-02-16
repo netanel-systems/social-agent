@@ -70,6 +70,7 @@ class LocalExecutor:
         if self._packages_installed:
             return
 
+        all_ok = True
         for pkg in _REQUIRED_PACKAGES:
             import_name = pkg.replace("-", "_")
             try:
@@ -94,8 +95,9 @@ class LocalExecutor:
                     logger.info("Installed: %s", pkg)
                 except Exception:
                     logger.warning("Failed to install %s", pkg, exc_info=True)
+                    all_ok = False
 
-        self._packages_installed = True
+        self._packages_installed = all_ok
 
     def execute_code(self, code: str) -> ExecutionResult:
         """Execute Python code in a subprocess.
