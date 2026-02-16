@@ -118,16 +118,16 @@ def cmd_kill(args: argparse.Namespace) -> None:
     controller = SandboxController()
     if args.all:
         killed = controller.kill_all()
-        print(f"Killed {len(killed)} sandbox(es): {killed}")  # noqa: T201
+        print(f"Killed {len(killed)} sandbox(es): {killed}")
     elif args.sandbox_id:
         result = controller.kill(args.sandbox_id)
         if result:
-            print(f"Killed sandbox {args.sandbox_id}")  # noqa: T201
+            print(f"Killed sandbox {args.sandbox_id}")
         else:
-            print(f"Sandbox {args.sandbox_id} not found or already dead")  # noqa: T201
+            print(f"Sandbox {args.sandbox_id} not found or already dead")
             sys.exit(1)
     else:
-        print("Error: provide <sandbox_id> or --all")  # noqa: T201
+        print("Error: provide <sandbox_id> or --all")
         sys.exit(1)
 
 
@@ -140,31 +140,31 @@ def cmd_observe(args: argparse.Namespace) -> None:
 
     # Health
     health = controller.check_health(sandbox_id)
-    print(f"Sandbox:  {health.sandbox_id}")  # noqa: T201
-    print(f"Status:   {health.status.value}")  # noqa: T201
+    print(f"Sandbox:  {health.sandbox_id}")
+    print(f"Status:   {health.status.value}")
     if health.current_action:
-        print(f"Action:   {health.current_action}")  # noqa: T201
+        print(f"Action:   {health.current_action}")
     if health.seconds_since_heartbeat is not None:
-        print(f"Heartbeat: {health.seconds_since_heartbeat:.0f}s ago")  # noqa: T201
+        print(f"Heartbeat: {health.seconds_since_heartbeat:.0f}s ago")
     if health.error:
-        print(f"Error:    {health.error}")  # noqa: T201
+        print(f"Error:    {health.error}")
 
     # State
     state = controller.read_state(sandbox_id)
     if state:
-        print("\nState:")  # noqa: T201
+        print("\nState:")
         for key, value in state.items():
-            print(f"  {key}: {value}")  # noqa: T201
+            print(f"  {key}: {value}")
 
     # Recent activity
     activity = controller.read_activity(sandbox_id, last_n=5)
     if activity:
-        print(f"\nRecent activity ({len(activity)} records):")  # noqa: T201
+        print(f"\nRecent activity ({len(activity)} records):")
         for record in activity:
             action = record.get("action", "?")
             success = record.get("success", "?")
             ts = record.get("timestamp", "?")
-            print(f"  [{ts}] {action} — success={success}")  # noqa: T201
+            print(f"  [{ts}] {action} — success={success}")
 
 
 def cmd_sandboxes(_args: argparse.Namespace) -> None:
@@ -174,11 +174,11 @@ def cmd_sandboxes(_args: argparse.Namespace) -> None:
     controller = SandboxController()
     sandboxes = controller.list_sandboxes()
     if not sandboxes:
-        print("No active sandboxes")  # noqa: T201
+        print("No active sandboxes")
         return
-    print(f"Active sandboxes ({len(sandboxes)}):")  # noqa: T201
+    print(f"Active sandboxes ({len(sandboxes)}):")
     for sbx in sandboxes:
-        print(f"  {sbx.sandbox_id} (template={sbx.template_id}, started={sbx.started_at})")  # noqa: T201
+        print(f"  {sbx.sandbox_id} (template={sbx.template_id}, started={sbx.started_at})")
 
 
 def cmd_inject_rule(args: argparse.Namespace) -> None:
@@ -187,7 +187,7 @@ def cmd_inject_rule(args: argparse.Namespace) -> None:
 
     controller = SandboxController()
     controller.inject_rule(args.sandbox_id, args.rule)
-    print(f"Rule injected into {args.sandbox_id}: {args.rule}")  # noqa: T201
+    print(f"Rule injected into {args.sandbox_id}: {args.rule}")
 
 
 def cmd_processes(args: argparse.Namespace) -> None:
@@ -197,11 +197,11 @@ def cmd_processes(args: argparse.Namespace) -> None:
     controller = SandboxController()
     processes = controller.list_processes(args.sandbox_id)
     if not processes:
-        print(f"No processes found in {args.sandbox_id}")  # noqa: T201
+        print(f"No processes found in {args.sandbox_id}")
         return
-    print(f"Processes in {args.sandbox_id} ({len(processes)}):")  # noqa: T201
+    print(f"Processes in {args.sandbox_id} ({len(processes)}):")
     for proc in processes:
-        print(f"  PID {proc.pid}: {proc.cmd or '(unknown)'}")  # noqa: T201
+        print(f"  PID {proc.pid}: {proc.cmd or '(unknown)'}")
 
 
 def cmd_status(_args: argparse.Namespace) -> None:

@@ -283,6 +283,28 @@ class TestReadActivity:
         result = controller.read_activity("sbx_123", last_n=10)
         assert len(result) == 2
 
+    def test_read_activity_zero_returns_empty(self, controller: SandboxController) -> None:
+        """last_n=0 returns empty list without reading."""
+        result = controller.read_activity("sbx_123", last_n=0)
+        assert result == []
+
+    def test_read_activity_negative_returns_empty(self, controller: SandboxController) -> None:
+        """Negative last_n returns empty list."""
+        result = controller.read_activity("sbx_123", last_n=-5)
+        assert result == []
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_read_activity_capped(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+        """last_n is capped at max_records."""
+        records = [json.dumps({"action": f"ACT_{i}"}) for i in range(5)]
+        content = "\n".join(records)
+        mock_sbx = MagicMock()
+        mock_sbx.files.read.return_value = content
+        mock_connect.return_value = mock_sbx
+
+        result = controller.read_activity("sbx_123", last_n=99999, max_records=3)
+        assert len(result) == 3
+
 
 # --- Rule injection tests ---
 

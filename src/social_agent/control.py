@@ -197,16 +197,22 @@ class SandboxController:
             logger.warning("read_state: Failed for %s: %s", sandbox_id, e)
             return {}
 
-    def read_activity(self, sandbox_id: str, last_n: int = 10) -> list[dict[str, Any]]:
+    def read_activity(
+        self, sandbox_id: str, last_n: int = 10, *, max_records: int = 1000
+    ) -> list[dict[str, Any]]:
         """Read recent activity records from a sandbox.
 
         Args:
             sandbox_id: Target sandbox.
-            last_n: Number of recent records to return.
+            last_n: Number of recent records to return (1-max_records).
+            max_records: Upper cap to prevent unbounded reads.
 
         Returns:
             List of parsed activity records (most recent last).
         """
+        if last_n <= 0:
+            return []
+        last_n = min(last_n, max_records)
         try:
             content = self.read_file(sandbox_id, _ACTIVITY_PATH)
             lines = [line.strip() for line in content.strip().split("\n") if line.strip()]
