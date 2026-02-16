@@ -219,6 +219,7 @@ def cmd_serve(args: argparse.Namespace) -> None:
 
     from social_agent.control import SandboxController
     from social_agent.cost import CostTracker
+    from social_agent.discovery import get_active_sandbox_id
     from social_agent.server import DashboardServer
 
     settings = get_settings()
@@ -228,6 +229,19 @@ def cmd_serve(args: argparse.Namespace) -> None:
         else ""
     )
 
+    # Auto-discover sandbox_id from nathan-brain if not provided
+    sandbox_id = args.sandbox_id
+    if sandbox_id is None:
+        brain_path = Path(args.brain_repo).expanduser()
+        sandbox_id = get_active_sandbox_id(brain_path)
+        if sandbox_id == "sbx-not-started":
+            print("⚠️  Agent not started yet. Dashboard will show 'No Data'")
+            print(f"    Monitoring: {brain_path}/state.json")
+        else:
+            print(f"✓ Auto-discovered sandbox: {sandbox_id}")
+    else:
+        print(f"✓ Using provided sandbox: {sandbox_id}")
+
     cost_tracker = CostTracker(
         cost_log_path=Path("logs/cost.jsonl"),
         budget_limit_usd=settings.budget_limit_usd,
@@ -235,7 +249,7 @@ def cmd_serve(args: argparse.Namespace) -> None:
     )
 
     server = DashboardServer(
-        sandbox_id=args.sandbox_id,
+        sandbox_id=sandbox_id,
         controller=SandboxController(),
         cost_tracker=cost_tracker,
         state_path=Path("state.json"),
@@ -312,7 +326,17 @@ def main() -> None:
     proc_parser.add_argument("sandbox_id", help="Sandbox ID")
 
     serve_parser = subparsers.add_parser("serve", help="Start dashboard API server")
-    serve_parser.add_argument("sandbox_id", help="Sandbox ID to monitor")
+    serve_parser.add_argument(
+        "sandbox_id",
+        nargs="?",
+        default=None,
+        help="Sandbox ID to monitor (auto-discovered from nathan-brain if not provided)",
+    )
+    serve_parser.add_argument(
+        "--brain-repo",
+        default="~/nathan-brain",
+        help="Path to nathan-brain repository (default: ~/nathan-brain)",
+    )
     serve_parser.add_argument(
         "--port", type=int, default=8080, help="Port to serve on (default: 8080)"
     )

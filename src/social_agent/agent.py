@@ -58,6 +58,7 @@ class AgentState:
     cycle_count: int = 0
     consecutive_failures: int = 0
     last_reset_date: str = ""
+    current_sandbox_id: str = ""  # Track active sandbox for dashboard discovery
 
     def reset_daily_counters(self) -> None:
         """Reset daily counters if the date has changed."""
@@ -182,6 +183,19 @@ class Agent:
 
         self._activity_log_path.parent.mkdir(parents=True, exist_ok=True)
         self._heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Update state with current sandbox_id for dashboard discovery
+        if self._sandbox_id and self._state.current_sandbox_id != self._sandbox_id:
+            self._state.current_sandbox_id = self._sandbox_id
+            self._state.save(self._state_path)
+            logger.info("Updated sandbox_id in state: %s", self._sandbox_id)
+
+            # Push to nathan-brain if git sync enabled
+            if settings.git_sync_enabled and settings.brain_repo_url:
+                from social_agent.git_push import push_state
+
+                brain_path = _Path("~/nathan-brain").expanduser()
+                push_state(brain_path, f"agent startup: sandbox_id={self._sandbox_id}")
 
     @property
     def state(self) -> AgentState:
