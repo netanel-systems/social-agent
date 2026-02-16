@@ -581,3 +581,85 @@ class TestPortProperty:
             port=9999,
         )
         assert srv.port == 9999
+
+
+# --- Static file serving ---
+
+
+def _fetch_raw(
+    url: str,
+    *,
+    method: str = "GET",
+) -> tuple[int, str, dict[str, str]]:
+    """Fetch a URL and return (status_code, body_text, headers)."""
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(url, method=method)
+    try:
+        with urllib.request.urlopen(req) as resp:
+            body = resp.read().decode("utf-8")
+            headers = {k.lower(): v for k, v in resp.headers.items()}
+            return resp.status, body, headers
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        headers = {k.lower(): v for k, v in e.headers.items()}
+        return e.code, body, headers
+
+
+class TestStaticFiles:
+    """Tests for static file serving."""
+
+    def test_index_served_at_root(self, server: DashboardServer) -> None:
+        """GET / serves index.html."""
+        status, body, headers = _fetch_raw(f"{_base_url(server)}/")
+        assert status == 200
+        assert "text/html" in headers.get("content-type", "")
+        assert "Nathan" in body
+        assert "<html" in body
+
+    def test_css_served(self, server: DashboardServer) -> None:
+        """GET /static/style.css serves the stylesheet."""
+        status, body, headers = _fetch_raw(
+            f"{_base_url(server)}/static/style.css"
+        )
+        assert status == 200
+        assert "text/css" in headers.get("content-type", "")
+        assert "--bg-primary" in body
+
+    def test_js_served(self, server: DashboardServer) -> None:
+        """GET /static/dashboard.js serves the JavaScript."""
+        status, body, headers = _fetch_raw(
+            f"{_base_url(server)}/static/dashboard.js"
+        )
+        assert status == 200
+        # JS MIME type may vary
+        content_type = headers.get("content-type", "")
+        assert "javascript" in content_type or "text/" in content_type
+        assert "Dashboard" in body
+
+    def test_missing_static_returns_404(
+        self, server: DashboardServer
+    ) -> None:
+        """Missing static file returns 404 JSON."""
+        status, _body = _make_request(
+            f"{_base_url(server)}/static/nonexistent.txt"
+        )
+        assert status == 404
+
+    def test_path_traversal_blocked(
+        self, server: DashboardServer
+    ) -> None:
+        """Path traversal attempts are rejected."""
+        status, _body = _make_request(
+            f"{_base_url(server)}/static/../server.py"
+        )
+        assert status == 404
+
+    def test_cache_header_set(self, server: DashboardServer) -> None:
+        """Static files have Cache-Control header."""
+        status, _body, headers = _fetch_raw(
+            f"{_base_url(server)}/static/style.css"
+        )
+        assert status == 200
+        assert "max-age=" in headers.get("cache-control", "")

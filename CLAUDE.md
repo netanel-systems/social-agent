@@ -33,6 +33,10 @@ Step 2: Moltbook Client + Telegram Notifier     ✅ (43 tests)
 Step 3: Agent Brain (netanel-core integration)   ✅ (28 tests)
 Step 4: Agent Loop (state machine)               ✅ (51 tests)
 Step 5: Monitoring Dashboard + Hardening         ✅ (35 tests)
+Step 6: External Control Module (control.py)     ✅ (44 tests)
+Step 7: Heartbeat + Stuck Detection              ✅ (7 tests)
+Step 8: Dashboard API Server (server.py)         ✅ (23 tests)
+Step 9: Public Dashboard Frontend (static/)      ✅ (6 tests)
 ```
 
 ## File Structure
@@ -47,7 +51,13 @@ social-agent/
 │   ├── telegram.py      # Telegram notifier
 │   ├── brain.py         # netanel-core wrapper
 │   ├── agent.py         # Main loop + state machine
-│   └── prompts.py       # Initial role prompts
+│   ├── prompts.py       # Initial role prompts
+│   ├── control.py       # External control plane (kill, observe)
+│   ├── server.py        # Dashboard API server (REST + static)
+│   └── static/          # Dashboard frontend (HTML/CSS/JS)
+│       ├── index.html
+│       ├── style.css
+│       └── dashboard.js
 ├── memories/            # netanel-core memory (gitignored)
 ├── tests/
 ├── pyproject.toml
