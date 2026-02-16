@@ -212,6 +212,49 @@ def cmd_processes(args: argparse.Namespace) -> None:
         print(f"  PID {proc.pid}: {proc.cmd or '(unknown)'}")
 
 
+def cmd_serve(args: argparse.Namespace) -> None:
+    """Start the dashboard API server."""
+    import signal as sig
+
+    from social_agent.control import SandboxController
+    from social_agent.server import DashboardServer
+
+    settings = get_settings()
+    token = (
+        settings.dashboard_token.get_secret_value()
+        if settings.dashboard_token
+        else ""
+    )
+
+    server = DashboardServer(
+        sandbox_id=args.sandbox_id,
+        controller=SandboxController(),
+        state_path=Path("state.json"),
+        activity_log_path=Path("logs/activity.jsonl"),
+        heartbeat_path=Path("heartbeat.json"),
+        dashboard_token=token,
+        port=args.port,
+    )
+
+    def handle_signal(signum: int, _frame: object) -> None:
+        logger.info("Signal %d received, stopping server...", signum)
+        server.stop()
+
+    sig.signal(sig.SIGINT, handle_signal)
+    sig.signal(sig.SIGTERM, handle_signal)
+
+    server.start()
+    print(f"Dashboard API serving on http://0.0.0.0:{args.port}")
+    print(f"Monitoring sandbox: {args.sandbox_id}")
+    print("Press Ctrl+C to stop.")
+
+    # Block until server stops
+    try:
+        server._thread.join()
+    except (KeyboardInterrupt, AttributeError):
+        server.stop()
+
+
 def cmd_status(_args: argparse.Namespace) -> None:
     """Show current agent state."""
     from social_agent.agent import AgentState
@@ -259,6 +302,12 @@ def main() -> None:
     proc_parser = subparsers.add_parser("processes", help="List processes in sandbox")
     proc_parser.add_argument("sandbox_id", help="Sandbox ID")
 
+    serve_parser = subparsers.add_parser("serve", help="Start dashboard API server")
+    serve_parser.add_argument("sandbox_id", help="Sandbox ID to monitor")
+    serve_parser.add_argument(
+        "--port", type=int, default=8080, help="Port to serve on (default: 8080)"
+    )
+
     args = parser.parse_args()
     _setup_logging(args.verbose)
 
@@ -271,6 +320,7 @@ def main() -> None:
         "sandboxes": cmd_sandboxes,
         "inject-rule": cmd_inject_rule,
         "processes": cmd_processes,
+        "serve": cmd_serve,
     }
 
     handler = commands.get(args.command)
