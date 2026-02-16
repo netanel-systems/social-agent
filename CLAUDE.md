@@ -41,6 +41,7 @@ Step 10: Git Persistence Layer (git_sync.py)     ✅ (28 tests)
 Step 11: Cost Tracking (cost.py)                 ✅ (33 tests)
 Step 12: Lifecycle Tools (lifecycle.py)          ✅ (29 tests)
 Step 13: GitHub Actions Watchdog                 ✅ (21 tests)
+Step 14: Architecture Doc Update                 ✅ (docs only)
 ```
 
 ## File Structure
