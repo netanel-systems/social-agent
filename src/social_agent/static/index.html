@@ -76,6 +76,38 @@
             </div>
         </section>
 
+        <!-- Cost panel -->
+        <section id="cost-panel" class="panel">
+            <h2>Cost Tracking</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-value" id="cost-total">$0.00</span>
+                    <span class="stat-label">Total Cost</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="cost-remaining">$0.00</span>
+                    <span class="stat-label">Budget Remaining</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="cost-budget-pct">0%</span>
+                    <span class="stat-label">Budget Used</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="cost-llm-calls">0</span>
+                    <span class="stat-label">LLM Calls</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="cost-tokens">0</span>
+                    <span class="stat-label">Tokens</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="cost-e2b">0s</span>
+                    <span class="stat-label">E2B Time</span>
+                </div>
+            </div>
+            <div id="cost-alert" class="cost-alert hidden">Budget alert triggered!</div>
+        </section>
+
         <!-- Activity feed -->
         <section id="activity-panel" class="panel">
             <h2>Recent Activity</h2>

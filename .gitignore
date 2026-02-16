@@ -29,6 +29,7 @@ logs/
 
 # Agent state (runtime)
 state.json
+heartbeat.json
 
 # OS
 .DS_Store

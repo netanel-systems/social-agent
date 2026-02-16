@@ -42,6 +42,7 @@ Step 11: Cost Tracking (cost.py)                 ✅ (33 tests)
 Step 12: Lifecycle Tools (lifecycle.py)          ✅ (29 tests)
 Step 13: GitHub Actions Watchdog                 ✅ (21 tests)
 Step 14: Architecture Doc Update                 ✅ (docs only)
+Step 15: Dashboard Deploy + Revenue Readiness    ✅ (4 tests)
 ```
 
 ## File Structure
@@ -68,6 +69,7 @@ social-agent/
 │       └── dashboard.js
 ├── memories/            # netanel-core memory (gitignored)
 ├── tests/
+├── Dockerfile           # Dashboard server container
 ├── pyproject.toml
 ├── ARCHITECTURE.md
 └── CLAUDE.md            # This file

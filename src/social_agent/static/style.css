@@ -207,6 +207,26 @@ main {
     font-size: 12px;
 }
 
+/* Cost alert */
+.cost-alert {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    background: rgba(210, 153, 34, 0.15);
+    border: 1px solid var(--warning);
+    color: var(--warning);
+    font-weight: 600;
+    text-align: center;
+}
+
+.panel-danger {
+    border-color: var(--danger);
+}
+
+.panel-danger .stat-value {
+    color: var(--danger);
+}
+
 /* Admin panel */
 .panel-admin {
     border-color: var(--danger);

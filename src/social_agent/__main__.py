@@ -10,6 +10,7 @@ Usage:
     python -m social_agent sandboxes                     # List active sandboxes
     python -m social_agent inject-rule <id> "<rule>"     # Inject a rule
     python -m social_agent processes <sandbox_id>        # List processes
+    python -m social_agent serve <sandbox_id>            # Start dashboard server
 
 Environment:
     Reads from .env file (via pydantic-settings).
@@ -217,6 +218,7 @@ def cmd_serve(args: argparse.Namespace) -> None:
     import signal as sig
 
     from social_agent.control import SandboxController
+    from social_agent.cost import CostTracker
     from social_agent.server import DashboardServer
 
     settings = get_settings()
@@ -226,9 +228,16 @@ def cmd_serve(args: argparse.Namespace) -> None:
         else ""
     )
 
+    cost_tracker = CostTracker(
+        cost_log_path=Path("logs/cost.jsonl"),
+        budget_limit_usd=settings.budget_limit_usd,
+        cost_alert_threshold=settings.cost_alert_threshold,
+    )
+
     server = DashboardServer(
         sandbox_id=args.sandbox_id,
         controller=SandboxController(),
+        cost_tracker=cost_tracker,
         state_path=Path("state.json"),
         activity_log_path=Path("logs/activity.jsonl"),
         heartbeat_path=Path("heartbeat.json"),

@@ -138,6 +138,36 @@ var Dashboard = (function () {
         setText("health-text", (data.status || "unknown").toUpperCase());
     }
 
+    function updateCost(data) {
+        if (!data) return;
+
+        setText("cost-total", "$" + (data.total_cost_usd || 0).toFixed(4));
+        setText("cost-remaining", "$" + (data.budget_remaining_usd || 0).toFixed(2));
+
+        var summary = data.summary || {};
+        var pct = summary.budget_used_pct || 0;
+        setText("cost-budget-pct", pct.toFixed(1) + "%");
+        setText("cost-llm-calls", summary.llm_calls || 0);
+        setText("cost-tokens", formatTokens(summary.llm_tokens || 0));
+        setText("cost-e2b", formatSeconds(summary.e2b_seconds || 0));
+
+        if (data.alert_triggered) {
+            show("cost-alert");
+        } else {
+            hide("cost-alert");
+        }
+
+        if (!data.within_budget) {
+            setClass("cost-panel", "panel panel-danger");
+        }
+    }
+
+    function formatTokens(count) {
+        if (count >= 1000000) return (count / 1000000).toFixed(1) + "M";
+        if (count >= 1000) return (count / 1000).toFixed(1) + "K";
+        return String(count);
+    }
+
     function updateActivity(data) {
         if (!data || !data.records) return;
 
@@ -175,12 +205,14 @@ var Dashboard = (function () {
             apiGet("status"),
             apiGet("stats"),
             apiGet("heartbeat"),
-            apiGet("activity?limit=" + MAX_ACTIVITY_ITEMS)
+            apiGet("activity?limit=" + MAX_ACTIVITY_ITEMS),
+            apiGet("cost")
         ]).then(function (results) {
             updateStatus(results[0]);
             updateStats(results[1]);
             updateHeartbeat(results[2]);
             updateActivity(results[3]);
+            updateCost(results[4]);
             setText("last-updated", "Updated: " + new Date().toLocaleTimeString());
         });
     }

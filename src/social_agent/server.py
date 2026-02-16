@@ -30,6 +30,8 @@ from social_agent.dashboard import build_dashboard, compute_action_stats, load_a
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from social_agent.cost import CostTracker
+
 # Resolve the static files directory at import time.
 _STATIC_DIR = _PathLib(__file__).parent / "static"
 
@@ -52,6 +54,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
     # Set by DashboardServer via partial()
     sandbox_id: str
     controller: SandboxController
+    cost_tracker: CostTracker | None
     dashboard_token: str
     state_path: Path
     activity_log_path: Path
@@ -72,6 +75,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
             "/api/activity": self._handle_activity,
             "/api/stats": self._handle_stats,
             "/api/heartbeat": self._handle_heartbeat,
+            "/api/cost": self._handle_cost,
         }
 
         handler = routes.get(path)
@@ -213,6 +217,29 @@ class _RequestHandler(BaseHTTPRequestHandler):
             "current_action": health.current_action,
             "seconds_since_heartbeat": health.seconds_since_heartbeat,
             "error": health.error,
+        })
+
+    def _handle_cost(self) -> None:
+        """GET /api/cost — Cost tracking + budget remaining."""
+        if self.cost_tracker is None:
+            self._send_json({
+                "total_cost_usd": 0.0,
+                "budget_limit_usd": 0.0,
+                "budget_remaining_usd": 0.0,
+                "within_budget": True,
+                "alert_triggered": False,
+                "summary": {},
+            })
+            return
+
+        summary = self.cost_tracker.daily_summary()
+        self._send_json({
+            "total_cost_usd": self.cost_tracker.total_cost_usd,
+            "budget_limit_usd": self.cost_tracker.budget_limit_usd,
+            "budget_remaining_usd": self.cost_tracker.budget_remaining_usd,
+            "within_budget": self.cost_tracker.within_budget,
+            "alert_triggered": self.cost_tracker.alert_triggered,
+            "summary": summary,
         })
 
     # --- Admin endpoints ---
@@ -373,6 +400,7 @@ class DashboardServer:
     Args:
         sandbox_id: ID of the sandbox to monitor.
         controller: SandboxController for E2B operations.
+        cost_tracker: CostTracker for cost data (optional).
         state_path: Path to local state.json.
         activity_log_path: Path to local activity.jsonl.
         heartbeat_path: Path to local heartbeat.json.
@@ -386,6 +414,7 @@ class DashboardServer:
         *,
         sandbox_id: str,
         controller: SandboxController | None = None,
+        cost_tracker: CostTracker | None = None,
         state_path: Path | None = None,
         activity_log_path: Path | None = None,
         heartbeat_path: Path | None = None,
@@ -397,6 +426,7 @@ class DashboardServer:
 
         self._sandbox_id = sandbox_id
         self._controller = controller or SandboxController()
+        self._cost_tracker = cost_tracker
         self._state_path = state_path or _Path("state.json")
         self._activity_log_path = activity_log_path or _Path("logs/activity.jsonl")
         self._heartbeat_path = heartbeat_path or _Path("heartbeat.json")
@@ -427,6 +457,7 @@ class DashboardServer:
         """Create a request handler class with bound config."""
         sandbox_id = self._sandbox_id
         controller = self._controller
+        cost_tracker = self._cost_tracker
         dashboard_token = self._dashboard_token
         state_path = self._state_path
         activity_log_path = self._activity_log_path
@@ -437,6 +468,7 @@ class DashboardServer:
 
         BoundHandler.sandbox_id = sandbox_id  # type: ignore[attr-defined]
         BoundHandler.controller = controller  # type: ignore[attr-defined]
+        BoundHandler.cost_tracker = cost_tracker  # type: ignore[attr-defined]
         BoundHandler.dashboard_token = dashboard_token  # type: ignore[attr-defined]
         BoundHandler.state_path = state_path  # type: ignore[attr-defined]
         BoundHandler.activity_log_path = activity_log_path  # type: ignore[attr-defined]
