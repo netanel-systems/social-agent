@@ -286,10 +286,12 @@ Git operations run in the background and never block the agent's main work.
 3. Mark resolved in UNKNOWNS.md if answered
 4. Add to VIOLATIONS.md if learned from mistake
 
-### Layer 4: Compaction lifecycle
+### Layer 4: Compaction lifecycle (PLANNED — design only)
 
-The orchestrator (DeepAgent) runs as a ReAct loop with a recursion limit.
-When context approaches limits, netanel-core's hook system handles compaction.
+The orchestrator (DeepAgent) will run as a ReAct loop with a recursion limit.
+When context approaches limits, netanel-core's hook system will handle compaction.
+**Note:** This layer is architectural design. Implementation requires the
+DeepAgent orchestrator (Layer 1 migration from state machine to LLM).
 
 **Pre-compaction (fires automatically via NathanMiddleware):**
 1. Save current task/plan to `state.json`
@@ -493,8 +495,9 @@ REST endpoints served by `http.server` (stdlib, zero deps):
 | `/api/kill` | POST | Admin | Kill switch (requires `DASHBOARD_TOKEN`) |
 | `/api/inject-rule` | POST | Admin | Inject rule (requires `DASHBOARD_TOKEN`) |
 
-**WebSocket:** `ws://host:8081/stream` — polls activity.jsonl every 2s,
-pushes new entries to all connected clients.
+**WebSocket (PLANNED):** `ws://host:8081/stream` — will poll activity.jsonl
+every 2s and push new entries to connected clients. Not yet implemented;
+the dashboard frontend currently uses polling via REST endpoints.
 
 **Auth model:**
 - Public viewers see everything read-only (all GET endpoints)
@@ -644,28 +647,30 @@ already installed. Everything else uses the existing E2B SDK and Python stdlib.
 ## 10. Build Order
 
 ```text
-Phase 0: Foundation (DONE)
-  Step 1-5:  Config, sandbox, moltbook, brain, dashboard CLI    DONE (205 tests)
+Phase 0: Foundation
+  Step 1-5:  Config, sandbox, moltbook, brain, dashboard CLI    DONE
 
-Phase 1: Safety First (BLOCKING — before agent runs autonomously)
-  Step 6:    External Control Module (control.py)               PLANNED
-  Step 7:    Heartbeat + Stuck Detection                        PLANNED
+Phase 1: Safety First
+  Step 6:    External Control Module (control.py)               DONE
+  Step 7:    Heartbeat + Stuck Detection                        DONE
 
 Phase 2: Dashboard Backend + Public Frontend
-  Step 8:    Dashboard API Server (server.py + stream.py)       PLANNED
-  Step 9:    Public Dashboard Frontend (static HTML/JS/CSS)     PLANNED
+  Step 8:    Dashboard API Server (server.py)                   DONE
+  Step 9:    Public Dashboard Frontend (static HTML/JS/CSS)     DONE
 
 Phase 3: Persistence + Cost
-  Step 10:   Git Persistence Layer (git_sync.py)                PLANNED
-  Step 11:   Cost Tracking (cost.py)                            PLANNED
+  Step 10:   Git Persistence Layer (git_sync.py)                DONE
+  Step 11:   Cost Tracking (cost.py)                            DONE
 
 Phase 4: Self-Migration + Watchdog
-  Step 12:   Lifecycle Tools (lifecycle.py)                     PLANNED
-  Step 13:   GitHub Actions Watchdog (watchdog.yml)             PLANNED
+  Step 12:   Lifecycle Tools (lifecycle.py)                     DONE
+  Step 13:   GitHub Actions Watchdog (watchdog.yml)             DONE
 
 Phase 5: Architecture Sync + Polish
-  Step 14:   Architecture Doc Update (status table)             PLANNED
+  Step 14:   Architecture Doc Update (status table)             DONE
   Step 15:   Dashboard Deploy + Revenue Readiness               PLANNED
+
+Total: 412 tests across 14 test files, 0 lint errors
 ```
 
 ### Dependency Graph
@@ -732,22 +737,22 @@ v2 (target): LLM-powered orchestrator, everything in E2B, self-governing, self-p
 | 5 | Agent brain (LearningLLM) | Layer 2 | DONE | 3 |
 | 6 | Agent loop (state machine) | Layer 1 | DONE | 4 |
 | 7 | Dashboard CLI | Monitoring | DONE | 5 |
-| 8 | Kill switch | Layer 7 | PLANNED | 6 |
-| 9 | External file I/O | Layer 7 | PLANNED | 6 |
-| 10 | Rule injection | Layer 7 | PLANNED | 6 |
-| 11 | Sandbox metrics | Layer 7 | PLANNED | 6 |
-| 12 | Heartbeat protocol | Layer 7 | PLANNED | 7 |
-| 13 | Stuck detection | Layer 7 | PLANNED | 7 |
-| 14 | Dashboard REST API | Layer 7 | PLANNED | 8 |
-| 15 | WebSocket streaming | Layer 7 | PLANNED | 8 |
-| 16 | Dashboard frontend | Layer 7 | PLANNED | 9 |
-| 17 | Git persistence | Layer 6 | PLANNED | 10 |
-| 18 | Cost tracking | Layer 7 | PLANNED | 11 |
-| 19 | Budget enforcement | Safety | PLANNED | 11 |
-| 20 | Self-migration | Layer 6 | PLANNED | 12 |
-| 21 | Orphan cleanup | Safety | PLANNED | 12 |
-| 22 | Watchdog (GitHub Actions) | Layer 6 | PLANNED | 13 |
-| 23 | Crash recovery | Layer 6 | PLANNED | 13 |
+| 8 | Kill switch | Layer 7 | DONE | 6 |
+| 9 | External file I/O | Layer 7 | DONE | 6 |
+| 10 | Rule injection | Layer 7 | DONE | 6 |
+| 11 | Sandbox metrics | Layer 7 | DONE | 6 |
+| 12 | Heartbeat protocol | Layer 7 | DONE | 7 |
+| 13 | Stuck detection | Layer 7 | DONE | 7 |
+| 14 | Dashboard REST API | Layer 7 | DONE | 8 |
+| 15 | WebSocket streaming | Layer 7 | PLANNED | — |
+| 16 | Dashboard frontend | Layer 7 | DONE | 9 |
+| 17 | Git persistence | Layer 6 | DONE | 10 |
+| 18 | Cost tracking | Layer 7 | DONE | 11 |
+| 19 | Budget enforcement | Safety | DONE | 11 |
+| 20 | Self-migration | Layer 6 | DONE | 12 |
+| 21 | Orphan cleanup | Safety | DONE | 12 |
+| 22 | Watchdog (GitHub Actions) | Layer 6 | DONE | 13 |
+| 23 | Crash recovery | Layer 6 | DONE | 13 |
 | 24 | Self-governance system | Layer 3 | PARTIAL | — |
 | 25 | Compaction lifecycle | Layer 4 | PLANNED | — |
 | 26 | DeepAgent orchestrator | Layer 1 | PLANNED | — |
