@@ -67,6 +67,12 @@ var Dashboard = (function () {
 
     // --- Formatters ---
 
+    function escapeHtml(str) {
+        var div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     function formatTime(isoString) {
         if (!isoString || isoString === "null") return "\u2014";
         try {
@@ -153,9 +159,10 @@ var Dashboard = (function () {
             var quality = r.quality_score ? " (q=" + r.quality_score.toFixed(2) + ")" : "";
 
             html += '<div class="feed-item">'
-                + '<span class="feed-time">' + formatTime(r.timestamp) + '</span>'
-                + '<span class="feed-action ' + successClass + '">' + (r.action || "?") + '</span>'
-                + '<span class="feed-detail">' + successText + quality + '</span>'
+                + '<span class="feed-time">' + escapeHtml(formatTime(r.timestamp)) + '</span>'
+                + '<span class="feed-action ' + successClass + '">'
+                + escapeHtml(r.action || "?") + '</span>'
+                + '<span class="feed-detail">' + escapeHtml(successText + quality) + '</span>'
                 + '</div>';
         }
         feed.innerHTML = html;

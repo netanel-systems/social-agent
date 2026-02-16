@@ -642,7 +642,7 @@ class TestStaticFiles:
         self, server: DashboardServer
     ) -> None:
         """Missing static file returns 404 JSON."""
-        status, body = _make_request(
+        status, _body = _make_request(
             f"{_base_url(server)}/static/nonexistent.txt"
         )
         assert status == 404
@@ -651,7 +651,7 @@ class TestStaticFiles:
         self, server: DashboardServer
     ) -> None:
         """Path traversal attempts are rejected."""
-        status, body = _make_request(
+        status, _body = _make_request(
             f"{_base_url(server)}/static/../server.py"
         )
         assert status == 404

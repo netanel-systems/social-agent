@@ -263,7 +263,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
         file_path = (_STATIC_DIR / filename).resolve()
 
         # Ensure the resolved path is still inside _STATIC_DIR
-        if not str(file_path).startswith(str(_STATIC_DIR.resolve())):
+        try:
+            file_path.relative_to(_STATIC_DIR.resolve())
+        except ValueError:
             self._send_json({"error": "Not found"}, status=404)
             return
 
