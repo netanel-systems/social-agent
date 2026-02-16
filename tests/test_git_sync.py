@@ -83,7 +83,7 @@ class TestSyncResult:
         """SyncResult has correct defaults."""
         result = SyncResult(
             timestamp="2026-02-16T12:00:00Z",
-            files=["state.json"],
+            files=("state.json",),
             commit_hash="abc1234",
             status="success",
             duration_ms=42.5,
@@ -96,7 +96,7 @@ class TestSyncResult:
         """SyncResult can store error info."""
         result = SyncResult(
             timestamp="2026-02-16T12:00:00Z",
-            files=["state.json"],
+            files=("state.json",),
             commit_hash="",
             status="failed",
             duration_ms=100.0,
@@ -111,7 +111,7 @@ class TestSyncResult:
         """SyncResult is immutable."""
         result = SyncResult(
             timestamp="2026-02-16T12:00:00Z",
-            files=[],
+            files=(),
             commit_hash="",
             status="success",
             duration_ms=0,
@@ -255,6 +255,7 @@ class TestSyncProcessing:
         self,
         git_sync: GitSync,
         mock_sandbox: MagicMock,
+        tracker_path: Path,
     ) -> None:
         """When no changes staged, skip commit and push."""
         # git diff --cached --quiet returns 0 (no changes)
@@ -269,6 +270,10 @@ class TestSyncProcessing:
 
         # Still counts as a sync (skipped)
         assert git_sync.stats["total_syncs"] == 1
+        # Tracker should record status as "skipped"
+        assert tracker_path.exists()
+        record = json.loads(tracker_path.read_text().strip().split("\n")[0])
+        assert record["status"] == "skipped"
 
     def test_failed_sync_retries(
         self,

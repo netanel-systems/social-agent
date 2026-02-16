@@ -54,7 +54,7 @@ class SyncResult:
     """Result of a git sync operation, logged to git_tracker.jsonl."""
 
     timestamp: str
-    files: list[str]
+    files: tuple[str, ...]
     commit_hash: str
     status: str  # "success", "failed", "skipped"
     duration_ms: float
@@ -199,7 +199,7 @@ class GitSync:
 
         # Clone repo — tolerate "already exists", fail on real errors
         clone_result = self.sandbox.run_bash(
-            f"git clone {auth_url} /home/user/brain"
+            f"git clone {shlex.quote(auth_url)} /home/user/brain"
         )
         if clone_result.exit_code != 0:
             stderr = clone_result.stderr or ""
@@ -243,13 +243,14 @@ class GitSync:
             try:
                 commit_hash = self._do_sync(entry)
                 duration_ms = (time.monotonic() - start_time) * 1000
+                status = "skipped" if commit_hash == "skipped" else "success"
 
                 self._total_syncs += 1
                 self._log_result(SyncResult(
                     timestamp=self._now_iso(),
                     files=entry.files,
                     commit_hash=commit_hash,
-                    status="success",
+                    status=status,
                     duration_ms=round(duration_ms, 1),
                     message=entry.message,
                     attempts=attempt,
