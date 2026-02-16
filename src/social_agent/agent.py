@@ -161,6 +161,8 @@ class Agent:
         sandbox: SandboxClient | None = None,
         state_path: Path | None = None,
         activity_log_path: Path | None = None,
+        heartbeat_path: Path | None = None,
+        sandbox_id: str = "",
     ) -> None:
         from pathlib import Path as _Path
 
@@ -171,12 +173,15 @@ class Agent:
         self._sandbox = sandbox
         self._state_path = state_path or _Path("state.json")
         self._activity_log_path = activity_log_path or _Path("logs/activity.jsonl")
+        self._heartbeat_path = heartbeat_path or _Path("heartbeat.json")
+        self._sandbox_id = sandbox_id
         self._state = AgentState.load(self._state_path)
         self._shutdown_requested = False
         self._recent_feed: list[MoltbookPost] = []
         self._research_context: str = ""
 
         self._activity_log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
 
     @property
     def state(self) -> AgentState:
@@ -231,18 +236,25 @@ class Agent:
         self._state.reset_daily_counters()
         logger.info("=== Cycle %d ===", self._state.cycle_count)
 
+        # Heartbeat: signal we're alive before deciding
+        self._write_heartbeat("DECIDING")
+
         # DECIDE
         action = self._decide()
         if action is None:
             self._state.consecutive_failures += 1
             self._log_activity("DECIDE", success=False, details="Could not parse action")
             self._notify("Decision failed — could not parse action", "warning")
+            self._write_heartbeat("IDLE")
             self._state.save(self._state_path)
             return CycleResult(
                 action="DECIDE",
                 success=False,
                 details="Could not parse action",
             )
+
+        # Heartbeat: signal what action we're taking
+        self._write_heartbeat(action.value)
 
         # ACT (learning happens inside brain.call via netanel-core)
         result = self._act(action)
@@ -252,6 +264,8 @@ class Agent:
         else:
             self._state.consecutive_failures += 1
 
+        # Heartbeat: signal action complete
+        self._write_heartbeat("IDLE")
         self._state.save(self._state_path)
         return result
 
@@ -632,6 +646,33 @@ class Agent:
             quality_score=result.score,
             details=details,
         )
+
+    # --- Heartbeat ---
+
+    def _write_heartbeat(self, current_action: str) -> None:
+        """Write heartbeat.json for external health monitoring.
+
+        Called at cycle start (DECIDING), before action, and after action (IDLE).
+        External control reads this to determine HEALTHY/STUCK/DEAD status.
+        See ARCHITECTURE.md Section 7.3.
+        """
+        # Use live sandbox_id when available (forward-compatible with migration)
+        sandbox_id = (
+            self._sandbox.sandbox_id
+            if self._sandbox is not None
+            else self._sandbox_id
+        )
+        heartbeat = {
+            "timestamp": datetime.now(tz=UTC).isoformat(),
+            "current_action": current_action,
+            "action_started_at": datetime.now(tz=UTC).isoformat(),
+            "cycle_count": self._state.cycle_count,
+            "sandbox_id": sandbox_id,
+        }
+        try:
+            self._heartbeat_path.write_text(json.dumps(heartbeat, indent=2))
+        except Exception:
+            logger.exception("Failed to write heartbeat")
 
     # --- Utilities ---
 

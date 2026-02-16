@@ -73,6 +73,11 @@ class SandboxClient:
         """Check if sandbox is currently active."""
         return self._sandbox is not None
 
+    @property
+    def sandbox_id(self) -> str | None:
+        """Return the sandbox ID if running, else None."""
+        return self._sandbox.sandbox_id if self._sandbox else None
+
     # Packages required in the sandbox for HTTP operations.
     _SANDBOX_PACKAGES = ("httpx", "duckduckgo-search")
 
