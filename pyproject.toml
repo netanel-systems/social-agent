@@ -19,6 +19,9 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
 ]
+deploy = [
+    "build>=1.0",
+]
 
 [tool.netanel-core]
 # Installed from local path during development

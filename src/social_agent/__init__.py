@@ -2,7 +2,7 @@
 
 from .agent import Action, ActivityRecord, Agent, AgentState, CycleResult
 from .brain import AgentBrain
-from .config import Settings, get_settings
+from .config import ExecutorMode, Settings, get_settings
 from .dashboard import (
     ActionStats,
     DashboardData,
@@ -11,6 +11,7 @@ from .dashboard import (
     format_dashboard,
     load_activity_log,
 )
+from .local_executor import LocalExecutor
 from .moltbook import (
     EngagementResult,
     FeedResult,
@@ -36,9 +37,11 @@ __all__ = [
     "DashboardData",
     "EngagementResult",
     "ExecutionResult",
+    "ExecutorMode",
     "FeedResult",
     "HeartbeatResult",
     "Level",
+    "LocalExecutor",
     "MoltbookClient",
     "MoltbookPost",
     "NAMESPACES",

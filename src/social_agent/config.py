@@ -6,6 +6,8 @@ All limits explicit. All secrets use SecretStr.
 
 from __future__ import annotations
 
+import os
+from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
@@ -22,6 +24,25 @@ _DEFAULT_CIRCUIT_BREAKER = 5
 _MIN_CYCLE_INTERVAL = 10  # 10 second floor (testing)
 
 
+class ExecutorMode(StrEnum):
+    """Execution mode for the agent's external actions.
+
+    SANDBOX: Use E2B sandbox (default, for local machine).
+    LOCAL: Execute directly (for running inside E2B or any isolated env).
+    """
+
+    SANDBOX = "sandbox"
+    LOCAL = "local"
+
+
+def detect_e2b_environment() -> bool:
+    """Detect if we're running inside an E2B sandbox.
+
+    E2B sandboxes set specific environment markers.
+    """
+    return os.environ.get("E2B_SANDBOX") == "true" or Path("/.e2b").exists()
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment / .env file.
 
@@ -35,9 +56,18 @@ class Settings(BaseSettings):
         extra="forbid",
     )
 
+    # --- Executor mode ---
+    executor_mode: ExecutorMode = Field(
+        default=ExecutorMode.SANDBOX,
+        description="Execution mode: 'sandbox' (E2B) or 'local' (direct)",
+    )
+
     # --- Required secrets ---
     openai_api_key: SecretStr
-    e2b_api_key: SecretStr
+    e2b_api_key: SecretStr | None = Field(
+        default=None,
+        description="E2B API key (required only in sandbox mode)",
+    )
 
     # --- Optional secrets (not needed for Step 1) ---
     moltbook_api_key: SecretStr | None = None
@@ -113,8 +143,11 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def ensure_memories_dir(self) -> Self:
-        """Create memories directory if it doesn't exist."""
+    def validate_executor_requirements(self) -> Self:
+        """Validate executor-specific requirements and create directories."""
+        if self.executor_mode == ExecutorMode.SANDBOX and self.e2b_api_key is None:
+            msg = "e2b_api_key is required when executor_mode='sandbox'"
+            raise ValueError(msg)
         self.memories_dir.mkdir(parents=True, exist_ok=True)
         return self
 

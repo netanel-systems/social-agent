@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import ValidationError
 
-from social_agent.config import Settings, get_settings
+from social_agent.config import ExecutorMode, Settings, get_settings
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -50,10 +50,27 @@ def test_missing_openai_key(tmp_path: Path) -> None:
         Settings(_env_file=None, e2b_api_key="e2b_test", memories_dir=tmp_path / "mem")  # type: ignore[call-arg]
 
 
-def test_missing_e2b_key(tmp_path: Path) -> None:
-    """Missing e2b_api_key raises ValidationError."""
+def test_missing_e2b_key_sandbox_mode(tmp_path: Path) -> None:
+    """Missing e2b_api_key in sandbox mode raises ValidationError."""
     with pytest.raises(ValidationError, match="e2b_api_key"):
-        Settings(_env_file=None, openai_api_key="sk-test", memories_dir=tmp_path / "mem")  # type: ignore[call-arg]
+        Settings(
+            _env_file=None,
+            openai_api_key="sk-test",
+            executor_mode="sandbox",
+            memories_dir=tmp_path / "mem",
+        )  # type: ignore[call-arg]
+
+
+def test_missing_e2b_key_local_mode(tmp_path: Path) -> None:
+    """Missing e2b_api_key in local mode is fine."""
+    settings = Settings(
+        _env_file=None,
+        openai_api_key="sk-test",
+        executor_mode="local",
+        memories_dir=tmp_path / "mem",
+    )  # type: ignore[call-arg]
+    assert settings.e2b_api_key is None
+    assert settings.executor_mode == ExecutorMode.LOCAL
 
 
 # --- Defaults ---
@@ -229,3 +246,41 @@ def test_langsmith_defaults(required_env: dict[str, object]) -> None:
     assert settings.langsmith_tracing is False
     assert settings.langsmith_project == "social-agent"
     assert settings.langsmith_api_key is None
+
+
+# --- Executor mode ---
+
+
+def test_default_executor_mode(required_env: dict[str, object]) -> None:
+    """Default executor mode is sandbox."""
+    settings = Settings(**required_env)  # type: ignore[arg-type]
+    assert settings.executor_mode == ExecutorMode.SANDBOX
+
+
+def test_local_executor_mode(tmp_path: Path) -> None:
+    """Local executor mode works without E2B key."""
+    settings = Settings(
+        _env_file=None,
+        openai_api_key="sk-test",
+        executor_mode="local",
+        memories_dir=tmp_path / "mem",
+    )  # type: ignore[call-arg]
+    assert settings.executor_mode == ExecutorMode.LOCAL
+    assert settings.e2b_api_key is None
+
+
+def test_sandbox_mode_requires_e2b_key(tmp_path: Path) -> None:
+    """Sandbox mode requires E2B API key."""
+    with pytest.raises(ValidationError, match="e2b_api_key"):
+        Settings(
+            _env_file=None,
+            openai_api_key="sk-test",
+            executor_mode="sandbox",
+            memories_dir=tmp_path / "mem",
+        )  # type: ignore[call-arg]
+
+
+def test_invalid_executor_mode(required_env: dict[str, object]) -> None:
+    """Invalid executor mode raises ValidationError."""
+    with pytest.raises(ValidationError):
+        Settings(**required_env, executor_mode="invalid")  # type: ignore[arg-type]

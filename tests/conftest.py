@@ -12,6 +12,7 @@ import pytest
 _SETTINGS_ENV_VARS = [
     "OPENAI_API_KEY",
     "E2B_API_KEY",
+    "EXECUTOR_MODE",
     "MOLTBOOK_API_KEY",
     "TELEGRAM_BOT_TOKEN",
     "TELEGRAM_CHAT_ID",
