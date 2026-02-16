@@ -409,6 +409,15 @@ class DashboardServer:
         self._thread = None
         logger.info("Dashboard server stopped")
 
+    def wait(self, timeout: float | None = None) -> None:
+        """Block until the server stops.
+
+        Provides a public API for blocking on the server thread,
+        avoiding direct access to the private _thread attribute.
+        """
+        if self._thread is not None:
+            self._thread.join(timeout=timeout)
+
     def __enter__(self) -> DashboardServer:
         """Context manager: start server."""
         self.start()

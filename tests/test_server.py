@@ -188,7 +188,7 @@ class TestActivity:
         mock_controller.read_activity.return_value = [
             {"action": "READ_FEED", "success": True}
         ]
-        status, body = _make_request(
+        status, _body = _make_request(
             f"{_base_url(server)}/api/activity?limit=1"
         )
         assert status == 200
@@ -277,7 +277,7 @@ class TestKill:
         self, server: DashboardServer
     ) -> None:
         """Kill rejected with wrong token."""
-        status, body = _make_request(
+        status, _body = _make_request(
             f"{_base_url(server)}/api/kill",
             method="POST",
             data={},
@@ -326,7 +326,7 @@ class TestInjectRule:
         self, server: DashboardServer
     ) -> None:
         """Inject rule rejected without auth."""
-        status, body = _make_request(
+        status, _body = _make_request(
             f"{_base_url(server)}/api/inject-rule",
             method="POST",
             data={"rule": "test"},
@@ -348,7 +348,7 @@ class TestNotFound:
 
     def test_unknown_post(self, server: DashboardServer) -> None:
         """Unknown POST returns 404."""
-        status, body = _make_request(
+        status, _body = _make_request(
             f"{_base_url(server)}/api/nonexistent",
             method="POST",
             data={},
@@ -370,6 +370,22 @@ class TestCORS:
         req = urllib.request.Request(f"{_base_url(server)}/api/status")
         with urllib.request.urlopen(req) as resp:
             assert resp.headers.get("Access-Control-Allow-Origin") == "*"
+
+    def test_options_preflight(self, server: DashboardServer) -> None:
+        """OPTIONS returns 204 with CORS headers."""
+        import urllib.request
+
+        req = urllib.request.Request(
+            f"{_base_url(server)}/api/status",
+            method="OPTIONS",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 204
+            assert resp.headers.get("Access-Control-Allow-Origin") == "*"
+            assert "POST" in resp.headers.get("Access-Control-Allow-Methods", "")
+            assert "Authorization" in resp.headers.get(
+                "Access-Control-Allow-Headers", ""
+            )
 
 
 # --- Server lifecycle ---

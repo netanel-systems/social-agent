@@ -250,8 +250,8 @@ def cmd_serve(args: argparse.Namespace) -> None:
 
     # Block until server stops
     try:
-        server._thread.join()
-    except (KeyboardInterrupt, AttributeError):
+        server.wait()
+    except KeyboardInterrupt:
         server.stop()
 
 
