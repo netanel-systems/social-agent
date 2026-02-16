@@ -92,6 +92,16 @@ class Settings(BaseSettings):
         description="Enable background git sync to brain repo",
     )
 
+    # --- Cost tracking (optional) ---
+    budget_limit_usd: float = Field(
+        default=50.0,
+        description="Maximum budget in USD before auto-pause",
+    )
+    cost_alert_threshold: float = Field(
+        default=0.8,
+        description="Fraction of budget that triggers alert (0.0-1.0)",
+    )
+
     # --- Paths ---
     memories_dir: Path = Field(
         default=Path("memories"),
@@ -109,23 +119,35 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         return v
 
-    @field_validator("quality_threshold")
+    @field_validator("quality_threshold", "cost_alert_threshold")
     @classmethod
-    def quality_threshold_range(cls, v: float) -> float:
-        """Quality threshold must be between 0.0 and 1.0."""
+    def unit_range(cls, v: float) -> float:
+        """Threshold must be between 0.0 and 1.0."""
         if not 0.0 <= v <= 1.0:
-            msg = f"quality_threshold must be between 0.0 and 1.0, got {v}"
+            msg = f"Threshold must be between 0.0 and 1.0, got {v}"
             raise ValueError(msg)
         return v
 
     @field_validator(
-        "max_posts_per_day", "max_replies_per_day", "max_cycles", "circuit_breaker_threshold"
+        "max_posts_per_day",
+        "max_replies_per_day",
+        "max_cycles",
+        "circuit_breaker_threshold",
     )
     @classmethod
-    def positive_limits(cls, v: int) -> int:
-        """All limits must be positive."""
+    def positive_int_limits(cls, v: int) -> int:
+        """All integer limits must be positive."""
         if v <= 0:
             msg = f"Limit must be positive, got {v}"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("budget_limit_usd")
+    @classmethod
+    def positive_budget(cls, v: float) -> float:
+        """Budget must be positive."""
+        if v <= 0:
+            msg = f"budget_limit_usd must be positive, got {v}"
             raise ValueError(msg)
         return v
 

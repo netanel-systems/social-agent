@@ -4,6 +4,7 @@ from .agent import Action, ActivityRecord, Agent, AgentState, CycleResult
 from .brain import AgentBrain
 from .config import Settings, get_settings
 from .control import HealthCheck, HealthStatus, ProcessInfo, SandboxController, SandboxInfo
+from .cost import CostEntry, CostTracker
 from .dashboard import (
     ActionStats,
     DashboardData,
@@ -35,6 +36,8 @@ __all__ = [
     "AgentBrain",
     "AgentState",
     "BashResult",
+    "CostEntry",
+    "CostTracker",
     "CycleResult",
     "DashboardData",
     "EngagementResult",
