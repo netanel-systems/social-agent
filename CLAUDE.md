@@ -37,6 +37,7 @@ Step 6: External Control Module (control.py)     ✅ (44 tests)
 Step 7: Heartbeat + Stuck Detection              ✅ (7 tests)
 Step 8: Dashboard API Server (server.py)         ✅ (23 tests)
 Step 9: Public Dashboard Frontend (static/)      ✅ (6 tests)
+Step 10: Git Persistence Layer (git_sync.py)     ✅ (28 tests)
 ```
 
 ## File Structure
@@ -54,6 +55,7 @@ social-agent/
 │   ├── prompts.py       # Initial role prompts
 │   ├── control.py       # External control plane (kill, observe)
 │   ├── server.py        # Dashboard API server (REST + static)
+│   ├── git_sync.py      # Background git persistence to nathan-brain
 │   └── static/          # Dashboard frontend (HTML/CSS/JS)
 │       ├── index.html
 │       ├── style.css
