@@ -286,10 +286,12 @@ Git operations run in the background and never block the agent's main work.
 3. Mark resolved in UNKNOWNS.md if answered
 4. Add to VIOLATIONS.md if learned from mistake
 
-### Layer 4: Compaction lifecycle
+### Layer 4: Compaction lifecycle (PLANNED — design only)
 
-The orchestrator (DeepAgent) runs as a ReAct loop with a recursion limit.
-When context approaches limits, netanel-core's hook system handles compaction.
+The orchestrator (DeepAgent) will run as a ReAct loop with a recursion limit.
+When context approaches limits, netanel-core's hook system will handle compaction.
+**Note:** This layer is architectural design. Implementation requires the
+DeepAgent orchestrator (Layer 1 migration from state machine to LLM).
 
 **Pre-compaction (fires automatically via NathanMiddleware):**
 1. Save current task/plan to `state.json`
@@ -493,8 +495,9 @@ REST endpoints served by `http.server` (stdlib, zero deps):
 | `/api/kill` | POST | Admin | Kill switch (requires `DASHBOARD_TOKEN`) |
 | `/api/inject-rule` | POST | Admin | Inject rule (requires `DASHBOARD_TOKEN`) |
 
-**WebSocket:** `ws://host:8081/stream` — polls activity.jsonl every 2s,
-pushes new entries to all connected clients.
+**WebSocket (PLANNED):** `ws://host:8081/stream` — will poll activity.jsonl
+every 2s and push new entries to connected clients. Not yet implemented;
+the dashboard frontend currently uses polling via REST endpoints.
 
 **Auth model:**
 - Public viewers see everything read-only (all GET endpoints)
@@ -645,29 +648,29 @@ already installed. Everything else uses the existing E2B SDK and Python stdlib.
 
 ```text
 Phase 0: Foundation
-  Step 1-5:  Config, sandbox, moltbook, brain, dashboard CLI    DONE (205 tests)
+  Step 1-5:  Config, sandbox, moltbook, brain, dashboard CLI    DONE
 
 Phase 1: Safety First
-  Step 6:    External Control Module (control.py)               DONE (44 tests)
-  Step 7:    Heartbeat + Stuck Detection                        DONE (7 tests)
+  Step 6:    External Control Module (control.py)               DONE
+  Step 7:    Heartbeat + Stuck Detection                        DONE
 
 Phase 2: Dashboard Backend + Public Frontend
-  Step 8:    Dashboard API Server (server.py)                   DONE (23 tests)
-  Step 9:    Public Dashboard Frontend (static HTML/JS/CSS)     DONE (6 tests)
+  Step 8:    Dashboard API Server (server.py)                   DONE
+  Step 9:    Public Dashboard Frontend (static HTML/JS/CSS)     DONE
 
 Phase 3: Persistence + Cost
-  Step 10:   Git Persistence Layer (git_sync.py)                DONE (28 tests)
-  Step 11:   Cost Tracking (cost.py)                            DONE (33 tests)
+  Step 10:   Git Persistence Layer (git_sync.py)                DONE
+  Step 11:   Cost Tracking (cost.py)                            DONE
 
 Phase 4: Self-Migration + Watchdog
-  Step 12:   Lifecycle Tools (lifecycle.py)                     DONE (29 tests)
-  Step 13:   GitHub Actions Watchdog (watchdog.yml)             DONE (21 tests)
+  Step 12:   Lifecycle Tools (lifecycle.py)                     DONE
+  Step 13:   GitHub Actions Watchdog (watchdog.yml)             DONE
 
 Phase 5: Architecture Sync + Polish
   Step 14:   Architecture Doc Update (status table)             DONE
   Step 15:   Dashboard Deploy + Revenue Readiness               PLANNED
 
-Total: 412 tests (Steps 1-13), 0 lint errors
+Total: 412 tests across 14 test files, 0 lint errors
 ```
 
 ### Dependency Graph
