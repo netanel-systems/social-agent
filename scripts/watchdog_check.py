@@ -41,7 +41,7 @@ _STUCK_THRESHOLD_S = 600  # 10 minutes — kill and redeploy
 class WatchdogResult:
     """Result of a watchdog check cycle."""
 
-    action: str  # "healthy", "deployed", "recovered", "cleaned", "failed"
+    action: str  # "healthy", "unknown", "deployed", "recovered", "cleaned", "failed"
     sandbox_id: str = ""
     killed: list[str] = field(default_factory=list)
     error: str = ""
@@ -199,7 +199,7 @@ def _handle_one_sandbox(
         "Agent health unknown (sandbox=%s, error=%s) — leaving running",
         sandbox_id, health.error,
     )
-    return WatchdogResult(action="healthy", sandbox_id=sandbox_id)
+    return WatchdogResult(action="unknown", sandbox_id=sandbox_id)
 
 
 def _handle_multiple_sandboxes(
@@ -216,7 +216,10 @@ def _handle_multiple_sandboxes(
     best_elapsed = float("inf")
 
     for sb in sandboxes:
-        health = controller.check_health(sb.sandbox_id)
+        health = controller.check_health(
+            sb.sandbox_id,
+            stuck_threshold=config.stuck_threshold_s,
+        )
         if health.status == HealthStatus.HEALTHY:
             elapsed = health.seconds_since_heartbeat or float("inf")
             if elapsed < best_elapsed:

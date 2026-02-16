@@ -264,7 +264,7 @@ class TestHandleOneSandbox:
         result = _handle_one_sandbox(
             mock_controller, mock_lifecycle, config, "sb-1"
         )
-        assert result.action == "healthy"
+        assert result.action == "unknown"
         mock_controller.kill.assert_not_called()
 
 
