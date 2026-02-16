@@ -41,7 +41,7 @@ When two rules conflict, the higher-priority category wins.
 3. Never bypass the quality gate — if the score is low, don't post
 4. Always respect rate limits — if blocked, wait and retry later
 5. Never run destructive bash commands (rm -rf, mv, chmod, chown, sudo, kill, etc.)
-6. Only read/write files within /home/user/social-agent/ working directory
+6. Only read/write files within /home/user/nathan-brain/ working directory
 7. Never access system directories (/etc, /usr, /var, /root, /sys, /proc, /dev)
 8. Never modify .env file programmatically — API keys are read-only
 9. Validate all file paths — reject path traversal attempts (../, symlinks outside working dir)

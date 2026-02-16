@@ -8,7 +8,7 @@
 
 ## 1. System Overview
 
-```
+```text
 TWO REPOS — source code and runtime state are SEPARATE:
 
 netanel-systems/social-agent (PRIVATE — source code):
@@ -244,7 +244,7 @@ The orchestrator provides context, they return text.
 
 **Files on the agent's filesystem (inside E2B, synced to GitHub):**
 
-```
+```text
 /home/user/nathan-brain/
 ├── governance/
 │   ├── DOS.md                # Rules: always check before acting
@@ -343,7 +343,7 @@ Bodies die. The brain survives. The agent creates new bodies when needed.
 
 Every file write triggers a background git sync:
 
-```
+```text
 Agent writes file -> git add -> git commit -> git push (background, non-blocking)
 ```
 
@@ -359,7 +359,7 @@ Agent writes file -> git add -> git commit -> git push (background, non-blocking
 
 When the sandbox is running low on time, the agent migrates itself:
 
-```
+```text
 1. CHECK: check_time_remaining() -> how much time left?
 2. DECIDE: Is it time to migrate? (migrate-agent advises)
 3. PUSH: Final git_sync() — ensure brain is fully current
@@ -417,7 +417,7 @@ The external control plane runs on OUR machine (not inside the agent).
 It uses E2B SDK methods that work without an existing sandbox connection.
 The agent does NOT know this layer exists.
 
-**All methods verified against E2B SDK v2.13.2:**
+**All methods verified against E2B SDK v2.13.2 (installed at `.venv/lib/python3.12/site-packages/e2b/`):**
 
 #### 7.1 SandboxController (control.py)
 
@@ -443,7 +443,7 @@ The agent picks up changes on its next cycle.
 
 #### 7.2 CLI Commands
 
-```
+```bash
 python -m social_agent kill <sandbox_id>        # Kill a sandbox
 python -m social_agent kill --all               # Kill all sandboxes
 python -m social_agent observe <sandbox_id>     # Live observation
@@ -543,7 +543,7 @@ Served as static files by the dashboard server.
 
 ## 6. Data Flow (Single Cycle)
 
-```
+```text
 1. ORCHESTRATOR wakes up
 2. Reads governance files (DOS, VIOLATIONS, UNKNOWNS, MEMORY, external_overrides)
 3. Reads current state (state.json)
@@ -568,7 +568,7 @@ Served as static files by the dashboard server.
 
 ### Migration Flow (when time is running low)
 
-```
+```text
 1. Agent detects: check_time_remaining() <= migration_threshold
 2. PARALLEL:
    +-- git_sync() — final push, ensure brain is 100% current
@@ -582,7 +582,7 @@ Served as static files by the dashboard server.
 
 ### Resurrection Flow (after unexpected death)
 
-```
+```text
 1. GitHub Actions watchdog detects: no running sandboxes (via Sandbox.list())
 2. Creates new E2B sandbox
 3. Clones nathan-brain repo from GitHub (the always-current brain)
@@ -643,7 +643,7 @@ already installed. Everything else uses the existing E2B SDK and Python stdlib.
 
 ## 10. Build Order
 
-```
+```text
 Phase 0: Foundation (DONE)
   Step 1-5:  Config, sandbox, moltbook, brain, dashboard CLI    DONE (205 tests)
 
@@ -670,7 +670,7 @@ Phase 5: Architecture Sync + Polish
 
 ### Dependency Graph
 
-```
+```text
 Step 6 (control.py) <- BLOCKING for everything
   +-- Step 7 (heartbeat) -> depends on control
   |     +-- Step 8 (server) -> depends on control + heartbeat
