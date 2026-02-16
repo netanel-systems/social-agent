@@ -78,6 +78,20 @@ class Settings(BaseSettings):
         description="Consecutive failures before auto-pause",
     )
 
+    # --- Git persistence (optional) ---
+    brain_repo_url: str | None = Field(
+        default=None,
+        description="GitHub repo URL for nathan-brain (agent state)",
+    )
+    github_token: SecretStr | None = Field(
+        default=None,
+        description="GitHub token for brain repo push access",
+    )
+    git_sync_enabled: bool = Field(
+        default=False,
+        description="Enable background git sync to brain repo",
+    )
+
     # --- Paths ---
     memories_dir: Path = Field(
         default=Path("memories"),

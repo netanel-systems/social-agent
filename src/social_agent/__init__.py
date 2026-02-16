@@ -12,6 +12,7 @@ from .dashboard import (
     format_dashboard,
     load_activity_log,
 )
+from .git_sync import GitSync, SyncEntry, SyncResult
 from .moltbook import (
     EngagementResult,
     FeedResult,
@@ -56,6 +57,9 @@ __all__ = [
     "Settings",
     "TelegramNotifier",
     "DashboardServer",
+    "GitSync",
+    "SyncEntry",
+    "SyncResult",
     "build_dashboard",
     "compute_action_stats",
     "format_dashboard",
