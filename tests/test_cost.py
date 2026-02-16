@@ -129,6 +129,11 @@ class TestLLMCostRecording:
         entry = tracker.record_llm_call("test", tokens_estimated=0)
         assert entry.cost_usd == 0.0
 
+    def test_negative_tokens_rejected(self, tracker: CostTracker) -> None:
+        """Negative tokens raises ValueError."""
+        with pytest.raises(ValueError, match="tokens_estimated"):
+            tracker.record_llm_call("test", tokens_estimated=-100)
+
 
 # --- E2B cost recording tests ---
 
@@ -160,6 +165,11 @@ class TestE2BCostRecording:
         """Zero seconds produces zero cost."""
         entry = tracker.record_e2b_time(0.0)
         assert entry.cost_usd == 0.0
+
+    def test_negative_seconds_rejected(self, tracker: CostTracker) -> None:
+        """Negative seconds raises ValueError."""
+        with pytest.raises(ValueError, match="seconds"):
+            tracker.record_e2b_time(-10.0)
 
 
 # --- Budget enforcement tests ---

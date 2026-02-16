@@ -124,7 +124,14 @@ class CostTracker:
 
         Returns:
             The logged CostEntry.
+
+        Raises:
+            ValueError: If tokens_estimated is negative.
         """
+        if tokens_estimated < 0:
+            msg = f"tokens_estimated must be >= 0, got {tokens_estimated}"
+            raise ValueError(msg)
+
         cost = (tokens_estimated / 1_000_000) * self.llm_cost_per_1m_tokens
 
         self._total_llm_calls += 1
@@ -150,7 +157,14 @@ class CostTracker:
 
         Returns:
             The logged CostEntry.
+
+        Raises:
+            ValueError: If seconds is negative.
         """
+        if seconds < 0:
+            msg = f"seconds must be >= 0, got {seconds}"
+            raise ValueError(msg)
+
         cost = (seconds / 3600) * self.e2b_cost_per_hour
 
         self._total_e2b_seconds += seconds
