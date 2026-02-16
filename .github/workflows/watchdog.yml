@@ -1,0 +1,35 @@
+name: Agent Watchdog
+
+on:
+  schedule:
+    # Every 15 minutes
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    # Allow manual trigger for testing
+
+permissions:
+  contents: read
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run watchdog check
+        env:
+          E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
+          BRAIN_REPO_URL: ${{ secrets.BRAIN_REPO_URL }}
+          GITHUB_TOKEN: ${{ secrets.BRAIN_GITHUB_TOKEN }}
+        run: python scripts/watchdog_check.py
