@@ -1,0 +1,7 @@
+# Minimal dependencies for dashboard server only
+# Does not include agent dependencies (netanel-core)
+
+e2b-code-interpreter>=1.0
+httpx>=0.27
+python-dotenv>=1.0
+pydantic-settings>=2.0

@@ -12,8 +12,16 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from netanel_core import CallResult, LearningLLM, MemoryStore, NathanConfig
-from netanel_core.config import EvalConfig, ModelConfig, SafetyBounds
+# netanel-core is optional (only needed for agent, not dashboard)
+try:
+    from netanel_core import CallResult, LearningLLM, MemoryStore, NathanConfig
+    from netanel_core.config import EvalConfig, ModelConfig, SafetyBounds
+except ImportError as e:
+    # Dashboard doesn't need netanel-core
+    if not TYPE_CHECKING:
+        raise ImportError(
+            "netanel-core not installed. Install with: pip install 'social-agent[agent]'"
+        ) from e
 
 from social_agent.prompts import NAMESPACES, PROMPTS
 

@@ -25,10 +25,10 @@ WORKDIR /app
 # Install git for nathan-brain cloning
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
-# Install the package
-COPY pyproject.toml .
+# Install dashboard dependencies only (minimal, no netanel-core)
+COPY requirements-dashboard.txt .
 COPY src/ src/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir -r requirements-dashboard.txt
 
 # Environment variables for nathan-brain
 ENV BRAIN_REPO_URL=https://github.com/netanel-systems/nathan-brain.git
