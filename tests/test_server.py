@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 import pytest
 
 from social_agent.control import HealthCheck, HealthStatus
+from social_agent.cost import CostTracker
 from social_agent.server import DashboardServer
 
 
@@ -663,3 +664,137 @@ class TestStaticFiles:
         )
         assert status == 200
         assert "max-age=" in headers.get("cache-control", "")
+
+
+# --- Cost endpoint ---
+
+
+class TestCost:
+    """Tests for GET /api/cost."""
+
+    def test_cost_without_tracker(
+        self, server: DashboardServer
+    ) -> None:
+        """Cost returns zeroed data when no CostTracker is configured."""
+        # Default server fixture has no cost_tracker
+        status, body = _make_request(f"{_base_url(server)}/api/cost")
+        assert status == 200
+        assert body["configured"] is False
+        assert body["total_cost_usd"] == 0.0
+        assert body["budget_limit_usd"] == 0.0
+        assert body["budget_remaining_usd"] == 0.0
+        assert body["within_budget"] is True
+        assert body["alert_triggered"] is False
+        assert body["summary"] == {}
+
+    def test_cost_with_tracker(
+        self,
+        mock_controller: MagicMock,
+        tmp_state: Path,
+        tmp_activity: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Cost returns real data from CostTracker."""
+        tracker = CostTracker(
+            cost_log_path=tmp_path / "cost.jsonl",
+            budget_limit_usd=10.0,
+            llm_cost_per_1m_tokens=0.4,
+        )
+        # Record some usage
+        tracker.record_llm_call("test-ns", tokens_estimated=500_000)
+        tracker.record_e2b_time(120.0)
+
+        srv = DashboardServer(
+            sandbox_id="sbx_test",
+            controller=mock_controller,
+            cost_tracker=tracker,
+            state_path=tmp_state,
+            activity_log_path=tmp_activity,
+            heartbeat_path=tmp_path / "heartbeat.json",
+            dashboard_token="test-secret-token",
+            port=0,
+        )
+        with srv:
+            time.sleep(0.1)
+            status, body = _make_request(f"{_base_url(srv)}/api/cost")
+
+        assert status == 200
+        assert body["configured"] is True
+        assert body["total_cost_usd"] > 0
+        assert body["budget_limit_usd"] == 10.0
+        assert body["budget_remaining_usd"] < 10.0
+        assert body["within_budget"] is True
+        assert body["alert_triggered"] is False
+        assert "llm_calls" in body["summary"]
+        assert "llm_tokens" in body["summary"]
+        assert "e2b_seconds" in body["summary"]
+        assert "budget_used_pct" in body["summary"]
+
+    def test_cost_alert_triggered(
+        self,
+        mock_controller: MagicMock,
+        tmp_state: Path,
+        tmp_activity: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Cost shows alert when threshold exceeded."""
+        tracker = CostTracker(
+            cost_log_path=tmp_path / "cost.jsonl",
+            budget_limit_usd=1.0,
+            cost_alert_threshold=0.5,
+            llm_cost_per_1m_tokens=0.4,
+        )
+        # Record enough to exceed 50% of $1 budget
+        # 0.40/1M tokens × 2M tokens = $0.80 → 80% of budget
+        tracker.record_llm_call("test-ns", tokens_estimated=2_000_000)
+
+        srv = DashboardServer(
+            sandbox_id="sbx_test",
+            controller=mock_controller,
+            cost_tracker=tracker,
+            state_path=tmp_state,
+            activity_log_path=tmp_activity,
+            heartbeat_path=tmp_path / "heartbeat.json",
+            port=0,
+        )
+        with srv:
+            time.sleep(0.1)
+            status, body = _make_request(f"{_base_url(srv)}/api/cost")
+
+        assert status == 200
+        assert body["alert_triggered"] is True
+        assert body["within_budget"] is True  # Still under $1
+
+    def test_cost_over_budget(
+        self,
+        mock_controller: MagicMock,
+        tmp_state: Path,
+        tmp_activity: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Cost shows over budget when limit exceeded."""
+        tracker = CostTracker(
+            cost_log_path=tmp_path / "cost.jsonl",
+            budget_limit_usd=0.01,  # Very small budget
+            llm_cost_per_1m_tokens=0.4,
+        )
+        # Record enough to exceed the budget
+        tracker.record_llm_call("test-ns", tokens_estimated=1_000_000)
+
+        srv = DashboardServer(
+            sandbox_id="sbx_test",
+            controller=mock_controller,
+            cost_tracker=tracker,
+            state_path=tmp_state,
+            activity_log_path=tmp_activity,
+            heartbeat_path=tmp_path / "heartbeat.json",
+            port=0,
+        )
+        with srv:
+            time.sleep(0.1)
+            status, body = _make_request(f"{_base_url(srv)}/api/cost")
+
+        assert status == 200
+        assert body["within_budget"] is False
+        assert body["budget_remaining_usd"] == 0.0
+        assert body["alert_triggered"] is True
