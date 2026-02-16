@@ -14,6 +14,7 @@ from .dashboard import (
     load_activity_log,
 )
 from .git_sync import GitSync, SyncEntry, SyncResult
+from .lifecycle import LifecycleManager, MigrationResult
 from .moltbook import (
     EngagementResult,
     FeedResult,
@@ -47,6 +48,8 @@ __all__ = [
     "HealthStatus",
     "HeartbeatResult",
     "Level",
+    "LifecycleManager",
+    "MigrationResult",
     "MoltbookClient",
     "MoltbookPost",
     "NAMESPACES",
