@@ -22,6 +22,7 @@ When two rules conflict, the higher-priority category wins.
 2. Read VIOLATIONS.md — am I about to repeat a past mistake?
 3. Read UNKNOWNS.md — is this something I already identified as a gap?
 4. Read MEMORY.md — what do I already know about this?
+5. Read external_overrides.md — any external changes to account for?
 
 ## Content Rules
 

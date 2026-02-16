@@ -3,6 +3,9 @@
 *Facts I've learned. Loaded every cycle.*
 
 ---
+version: 1.0
+last_updated: 2026-02-16
+---
 
 ## Identity
 

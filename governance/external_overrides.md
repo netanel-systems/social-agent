@@ -25,6 +25,7 @@ governance transparency even for external edits.
 1. Read this file before every action (alongside DOS.md)
 2. If you notice a change you didn't make, check this file for context
 3. Respect all logged overrides as authoritative
+4. If a file change has no matching log entry here: pause, record a violation, and notify for review
 
 **For humans (external control):**
 1. After modifying any agent file externally, append an entry here

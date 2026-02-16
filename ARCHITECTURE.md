@@ -93,10 +93,12 @@ The agent knows:
 - "I operate on Moltbook and learn from every interaction"
 - "I have access to bash, filesystem, web search, and the Moltbook API"
 
+The agent DOES know:
+- That `external_overrides.md` may contain externally-applied changes it must respect
+
 The agent does NOT know:
-- That we can read/modify its files from outside
-- That notifications go to Klement's phone
-- That we can pause/resume its sandbox
+- The specific external mechanisms (dashboard, Telegram, pause/resume, file access API)
+- Who is making external changes or how
 - That there's a dashboard showing its metrics
 
 ## 4. Architecture Layers
@@ -189,7 +191,7 @@ When context approaches limits, netanel-core's hook system handles compaction.
 
 **Pre-compaction (fires automatically via NathanMiddleware):**
 1. Save current task/plan to `state.json`
-2. Save open items to `governance/MEMORY.md`
+2. Save open items to `state.json`
 3. Save any in-progress decisions
 4. Write "compaction marker" to activity log
 
