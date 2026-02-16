@@ -223,6 +223,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
         """GET /api/cost — Cost tracking + budget remaining."""
         if self.cost_tracker is None:
             self._send_json({
+                "configured": False,
                 "total_cost_usd": 0.0,
                 "budget_limit_usd": 0.0,
                 "budget_remaining_usd": 0.0,
@@ -234,6 +235,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
         summary = self.cost_tracker.daily_summary()
         self._send_json({
+            "configured": True,
             "total_cost_usd": self.cost_tracker.total_cost_usd,
             "budget_limit_usd": self.cost_tracker.budget_limit_usd,
             "budget_remaining_usd": self.cost_tracker.budget_remaining_usd,

@@ -23,6 +23,11 @@ COPY pyproject.toml .
 COPY src/ src/
 RUN pip install --no-cache-dir .
 
+# Create unprivileged user for runtime
+RUN groupadd --system app && useradd --system --gid app --shell /usr/sbin/nologin app \
+    && chown -R app:app /app
+USER app
+
 # Default port
 ENV PORT=8080
 

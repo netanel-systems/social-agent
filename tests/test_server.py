@@ -679,6 +679,7 @@ class TestCost:
         # Default server fixture has no cost_tracker
         status, body = _make_request(f"{_base_url(server)}/api/cost")
         assert status == 200
+        assert body["configured"] is False
         assert body["total_cost_usd"] == 0.0
         assert body["budget_limit_usd"] == 0.0
         assert body["budget_remaining_usd"] == 0.0
@@ -697,6 +698,7 @@ class TestCost:
         tracker = CostTracker(
             cost_log_path=tmp_path / "cost.jsonl",
             budget_limit_usd=10.0,
+            llm_cost_per_1m_tokens=0.4,
         )
         # Record some usage
         tracker.record_llm_call("test-ns", tokens_estimated=500_000)
@@ -717,6 +719,7 @@ class TestCost:
             status, body = _make_request(f"{_base_url(srv)}/api/cost")
 
         assert status == 200
+        assert body["configured"] is True
         assert body["total_cost_usd"] > 0
         assert body["budget_limit_usd"] == 10.0
         assert body["budget_remaining_usd"] < 10.0
@@ -739,6 +742,7 @@ class TestCost:
             cost_log_path=tmp_path / "cost.jsonl",
             budget_limit_usd=1.0,
             cost_alert_threshold=0.5,
+            llm_cost_per_1m_tokens=0.4,
         )
         # Record enough to exceed 50% of $1 budget
         # 0.40/1M tokens × 2M tokens = $0.80 → 80% of budget
@@ -772,6 +776,7 @@ class TestCost:
         tracker = CostTracker(
             cost_log_path=tmp_path / "cost.jsonl",
             budget_limit_usd=0.01,  # Very small budget
+            llm_cost_per_1m_tokens=0.4,
         )
         # Record enough to exceed the budget
         tracker.record_llm_call("test-ns", tokens_estimated=1_000_000)

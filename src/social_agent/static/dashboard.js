@@ -159,6 +159,8 @@ var Dashboard = (function () {
 
         if (!data.within_budget) {
             setClass("cost-panel", "panel panel-danger");
+        } else {
+            setClass("cost-panel", "panel");
         }
     }
 
