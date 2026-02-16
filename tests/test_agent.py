@@ -82,6 +82,7 @@ def agent(
         notifier=mock_notifier,
         state_path=tmp_dir / "state.json",
         activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+        heartbeat_path=tmp_dir / "heartbeat.json",
     )
 
 
@@ -905,3 +906,157 @@ def test_research_context_in_decision(
     agent._research_context = "Some research about AI agents"
     context = agent._build_decision_context()
     assert "Research context available: YES" in context
+
+
+# --- Heartbeat ---
+
+
+def test_heartbeat_written_during_cycle(
+    agent: Agent,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Heartbeat file is written during cycle."""
+    mock_brain.call.return_value = _brain_result("READ_FEED")
+    mock_moltbook.get_feed.return_value = FeedResult(posts=[])
+
+    agent.cycle()
+
+    heartbeat_path = tmp_dir / "heartbeat.json"
+    assert heartbeat_path.exists()
+    heartbeat = json.loads(heartbeat_path.read_text())
+    assert "timestamp" in heartbeat
+    assert "current_action" in heartbeat
+    assert "cycle_count" in heartbeat
+    assert "sandbox_id" in heartbeat
+
+
+def test_heartbeat_content(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Heartbeat contains correct content after cycle."""
+    mock_brain.call.return_value = _brain_result("READ_FEED")
+    mock_moltbook.get_feed.return_value = FeedResult(posts=[])
+
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+        heartbeat_path=tmp_dir / "heartbeat.json",
+        sandbox_id="sbx_test_123",
+    )
+    agent.cycle()
+
+    heartbeat = json.loads((tmp_dir / "heartbeat.json").read_text())
+    assert heartbeat["sandbox_id"] == "sbx_test_123"
+    assert heartbeat["cycle_count"] == 1
+    # After cycle completes, action should be IDLE
+    assert heartbeat["current_action"] == "IDLE"
+
+
+def test_heartbeat_updates_each_cycle(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Heartbeat cycle_count updates on each cycle."""
+    mock_settings.max_cycles = 3
+    mock_brain.call.return_value = _brain_result("READ_FEED")
+    mock_moltbook.get_feed.return_value = FeedResult(posts=[])
+
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+        heartbeat_path=tmp_dir / "heartbeat.json",
+    )
+
+    agent.cycle()
+    hb1 = json.loads((tmp_dir / "heartbeat.json").read_text())
+    assert hb1["cycle_count"] == 1
+
+    agent.cycle()
+    hb2 = json.loads((tmp_dir / "heartbeat.json").read_text())
+    assert hb2["cycle_count"] == 2
+
+
+def test_heartbeat_default_path(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Heartbeat defaults to heartbeat.json in working dir."""
+    import os
+
+    original_dir = os.getcwd()
+    os.chdir(tmp_dir)
+    try:
+        agent = Agent(
+            settings=mock_settings,
+            brain=mock_brain,
+            moltbook=mock_moltbook,
+            notifier=mock_notifier,
+            state_path=tmp_dir / "state.json",
+            activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+        )
+        assert agent._heartbeat_path.name == "heartbeat.json"
+    finally:
+        os.chdir(original_dir)
+
+
+def test_heartbeat_default_sandbox_id(agent: Agent) -> None:
+    """Sandbox ID defaults to empty string."""
+    assert agent._sandbox_id == ""
+
+
+def test_heartbeat_path_parent_created(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Heartbeat path parent directories are created."""
+    heartbeat_path = tmp_dir / "deep" / "nested" / "heartbeat.json"
+    Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+        heartbeat_path=heartbeat_path,
+    )
+    assert heartbeat_path.parent.exists()
+
+
+def test_heartbeat_on_decision_failure(
+    agent: Agent,
+    mock_brain: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Heartbeat is written even when decision fails."""
+    mock_brain.call.return_value = _brain_result("I'm confused")
+
+    agent.cycle()
+
+    heartbeat_path = tmp_dir / "heartbeat.json"
+    assert heartbeat_path.exists()
+    heartbeat = json.loads(heartbeat_path.read_text())
+    # After failed decision, action should be IDLE
+    assert heartbeat["current_action"] == "IDLE"

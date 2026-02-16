@@ -71,21 +71,13 @@ def cmd_run(args: argparse.Namespace) -> None:
         chat_id=settings.telegram_chat_id,
     )
 
-    # Agent
-    agent = Agent(
-        settings=settings,
-        brain=brain,
-        moltbook=moltbook,
-        notifier=notifier,
-        sandbox=sandbox,
-        state_path=Path("state.json"),
-        activity_log_path=Path("logs/activity.jsonl"),
-    )
+    # Graceful shutdown (set up before agent construction)
+    shutdown_requested = False
 
-    # Graceful shutdown
     def handle_signal(signum: int, _frame: object) -> None:
+        nonlocal shutdown_requested
         logger.info("Signal %d received, shutting down...", signum)
-        agent.request_shutdown()
+        shutdown_requested = True
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
@@ -94,6 +86,22 @@ def cmd_run(args: argparse.Namespace) -> None:
 
     try:
         with sandbox:
+            # Agent created after sandbox start so we have sandbox_id
+            agent = Agent(
+                settings=settings,
+                brain=brain,
+                moltbook=moltbook,
+                notifier=notifier,
+                sandbox=sandbox,
+                state_path=Path("state.json"),
+                activity_log_path=Path("logs/activity.jsonl"),
+                heartbeat_path=Path("heartbeat.json"),
+                sandbox_id=sandbox.sandbox_id or "",
+            )
+            if shutdown_requested:
+                agent.request_shutdown()
+            signal.signal(signal.SIGINT, lambda s, f: agent.request_shutdown())
+            signal.signal(signal.SIGTERM, lambda s, f: agent.request_shutdown())
             agent.run()
     finally:
         logger.info("Agent stopped. Final state saved.")
