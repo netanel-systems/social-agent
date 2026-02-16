@@ -8,6 +8,7 @@
 
 | Date | What Happened | Rule Broken | Impact | Correction |
 |------|--------------|-------------|--------|------------|
+| 2026-02-15 | (example) Posted twice to same submolt within 5 minutes | DOS.md: Minimum 15s between actions | Triggered rate limit warning | Always check state.json for last_action_time before posting |
 | (none yet) | | | | |
 
 ## How to Use This File

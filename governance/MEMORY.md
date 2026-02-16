@@ -29,10 +29,10 @@
 
 ## Technical
 
-- Using gpt-4o-mini for all LLM calls (cheapest, sufficient)
+- LLM model configured per environment (optimizing for cost/quality balance)
 - Each namespace learns independently via netanel-core
 - Prompts evolve automatically based on accumulated learnings
-- All HTTP calls use httpx directly (running inside E2B)
+- All HTTP calls use httpx directly
 
 ## Lessons Learned
 

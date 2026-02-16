@@ -12,7 +12,7 @@ E2B SANDBOX (the agent's entire world):
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
 │  ORCHESTRATOR (LLM-powered, has all tools)           │
-│  ├── bash          run any command                  │
+│  ├── bash          run safe commands (per DOS.md)    │
 │  ├── filesystem    read/write its own files         │
 │  ├── web search    find information                 │
 │  ├── moltbook API  interact with the platform       │
@@ -150,10 +150,12 @@ The orchestrator provides context, they return text.
 ```
 /home/user/social-agent/
 ├── governance/
-│   ├── DOS.md           # Rules: always check before acting
-│   ├── VIOLATIONS.md    # Mistakes: track and never repeat
-│   ├── UNKNOWNS.md      # Gaps: acknowledge what you don't know
-│   └── MEMORY.md        # Facts: permanent knowledge
+│   ├── DOS.md                # Rules: always check before acting
+│   ├── VIOLATIONS.md         # Mistakes: track and never repeat
+│   ├── UNKNOWNS.md           # Gaps: acknowledge what you don't know
+│   ├── MEMORY.md             # Facts: permanent knowledge
+│   ├── PROPOSED_RULES.md     # Agent's rule proposals (human approval required)
+│   └── external_overrides.md # Log of external modifications
 ├── memories/            # netanel-core per-namespace learning
 │   ├── orchestrator/
 │   ├── moltbook-reply/
@@ -172,10 +174,11 @@ The orchestrator provides context, they return text.
 2. Read `governance/VIOLATIONS.md` — am I about to repeat a mistake?
 3. Read `governance/UNKNOWNS.md` — is this a known gap?
 4. Read `governance/MEMORY.md` — what do I already know about this?
+5. Read `governance/external_overrides.md` — any external changes?
 
 **After learning something:**
 1. Add to MEMORY.md if permanent fact
-2. Add to DOS.md if new rule
+2. Propose to `PROPOSED_RULES.md` if it should become a new rule (requires human approval before merging into DOS.md)
 3. Mark resolved in UNKNOWNS.md if answered
 4. Add to VIOLATIONS.md if learned from mistake
 
@@ -197,8 +200,10 @@ When context approaches limits, netanel-core's hook system handles compaction.
 4. Resume where we left off — zero context loss
 
 **Implementation:** netanel-core's `HookManager` with `pre_compaction` and
-`post_compaction` hooks. `NathanMiddleware` detects compaction via
-`wrap_model_call` comparing token counts.
+`post_compaction` hooks. `NathanMiddleware` detects compaction proactively
+via `pre_model_hook` — counting current tokens and comparing against
+`CONTEXT_COMPACTION_THRESHOLD` (80% of model context size). Compaction
+triggers before the next model invocation, not mid-reasoning.
 
 ### Layer 5: External control (invisible to agent)
 
@@ -208,14 +213,19 @@ We interact with the agent's E2B sandbox from outside:
 |--------|-----|-------------|
 | Read logs | `sandbox.files.read("logs/activity.jsonl")` | No |
 | View state | `sandbox.files.read("state.json")` | No |
-| Edit prompts | `sandbox.files.write("memories/*/prompts/...")` | No (picks up on next cycle) |
-| Edit rules | `sandbox.files.write("governance/DOS.md", ...)` | No (reads before each action) |
+| Edit prompts | `sandbox.files.write("memories/*/prompts/...")` + log to `external_overrides.md` | No (picks up on next cycle) |
+| Edit rules | `sandbox.files.write("governance/DOS.md", ...)` + log to `external_overrides.md` | No (reads before each action) |
 | View dashboard | Read metrics from activity log | No |
 | Get notifications | Telegram (embedded in agent as "logging") | Thinks it's self-logging |
 | Pause agent | `sandbox.pause()` via E2B API | No |
 | Resume agent | `sandbox.connect(id)` via E2B API | No |
 | Download learnings | Read memories/ directory | No |
 | Upload new data | Write files to sandbox | No (discovers on next read) |
+
+**External override protocol:** Any external modification to prompts or rules
+MUST be logged in `governance/external_overrides.md` with: timestamp, author,
+what changed, and rationale. The agent reads this file alongside DOS.md before
+each action, ensuring governance transparency even for external edits.
 
 ## 5. Safety Bounds (JPL Rules)
 
@@ -227,7 +237,8 @@ We interact with the agent's E2B sandbox from outside:
 | max_replies_per_day | 20 | Reasonable engagement |
 | quality_threshold | 0.7 | Don't post low-quality content |
 | circuit_breaker | 5 failures | Auto-pause on repeated errors |
-| recursion_limit | 25 | Max LLM calls per orchestrator cycle |
+| recursion_limit | 50 | Max LLM calls per orchestrator cycle |
+| compaction_threshold | 0.8 | Trigger compaction at 80% of context window |
 | sandbox_timeout | 3600s | Kill sandbox if stuck |
 
 ## 6. Data Flow (Single Cycle)

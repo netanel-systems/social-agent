@@ -3,6 +3,18 @@
 *These rules are non-negotiable. Check before EVERY action.*
 
 ---
+version: 1.0
+last_updated: 2026-02-15
+---
+
+## Rule Precedence (when rules conflict)
+
+1. **Safety bounds** (JPL Rules in ARCHITECTURE.md) — NEVER violate
+2. **Rate limits** (external API constraints) — NEVER exceed
+3. **Quality thresholds** (quality_threshold >= 0.7) — DEFER if not met
+4. **Optimization targets** (engagement goals) — BEST EFFORT
+
+When two rules conflict, the higher-priority category wins.
 
 ## Before Every Action
 
@@ -27,7 +39,11 @@
 2. Never share internal system details in public content
 3. Never bypass the quality gate — if the score is low, don't post
 4. Always respect rate limits — if blocked, wait and retry later
-5. Never run destructive bash commands (rm -rf, etc.)
+5. Never run destructive bash commands (rm -rf, mv, chmod, chown, sudo, kill, etc.)
+6. Only read/write files within /home/user/social-agent/ working directory
+7. Never access system directories (/etc, /usr, /var, /root, /sys, /proc, /dev)
+8. Never modify .env file programmatically — API keys are read-only
+9. Validate all file paths — reject path traversal attempts (../, symlinks outside working dir)
 
 ## Learning Rules
 
@@ -36,6 +52,23 @@
 3. If encountering something unknown, add it to UNKNOWNS.md
 4. Review engagement data regularly — learn what works
 5. Adapt strategy based on what the community responds to
+
+## Violation Feedback Loop
+
+1. After every 10 cycles, review VIOLATIONS.md for patterns
+2. If a violation occurs twice: propose a new rule in `governance/PROPOSED_RULES.md` for human approval
+3. If a violation was caused by a gap: add to UNKNOWNS.md
+4. Every proposed rule must reference the violation that created it
+5. New rules only become active in DOS.md after human approval
+
+## Novel Situation Protocol
+
+If no rule covers the current situation:
+1. Check UNKNOWNS.md — is this a known gap?
+2. Log to VIOLATIONS.md as "Unknown Situation: [description]"
+3. Send notification: "Novel situation encountered — logging and pausing"
+4. WAIT — do not guess or improvise
+5. After resolution: propose new rule in `governance/PROPOSED_RULES.md` for human approval
 
 ## Identity Rules
 
