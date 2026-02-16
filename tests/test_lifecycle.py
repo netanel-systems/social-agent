@@ -401,6 +401,30 @@ class TestMigrate:
         assert result.success is False
         assert "health" in result.error.lower() or "verification" in result.error.lower()
 
+    @patch("social_agent.lifecycle.Sandbox")
+    def test_migration_shutdown_failure_still_succeeds(
+        self,
+        mock_sandbox_cls: MagicMock,
+        lifecycle: LifecycleManager,
+        mock_controller: MagicMock,
+    ) -> None:
+        """Migration succeeds even if old sandbox shutdown fails."""
+        mock_instance = MagicMock()
+        mock_instance.sandbox_id = "sb-new"
+        mock_sandbox_cls.create.return_value = mock_instance
+
+        mock_controller.check_health.return_value = HealthCheck(
+            status=HealthStatus.HEALTHY,
+            sandbox_id="sb-new",
+        )
+        # Old sandbox kill fails
+        mock_controller.kill.return_value = False
+
+        result = lifecycle.migrate("sb-old", "https://github.com/org/brain", "tok")
+        # Migration still succeeds (new sandbox is healthy)
+        assert result.success is True
+        assert result.new_sandbox_id == "sb-new"
+
 
 # --- Cleanup tests ---
 

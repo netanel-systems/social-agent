@@ -328,7 +328,12 @@ class LifecycleManager:
             )
 
         # Step 4: Graceful shutdown of old
-        self.graceful_shutdown(current_sandbox_id)
+        shutdown_ok = self.graceful_shutdown(current_sandbox_id)
+        if not shutdown_ok:
+            logger.warning(
+                "Migration succeeded but old sandbox %s may still be running",
+                current_sandbox_id,
+            )
 
         duration = round(time.monotonic() - start, 1)
         logger.info(
