@@ -20,6 +20,7 @@ import contextlib
 import json
 import logging
 import queue
+import shlex
 import threading
 import time
 from dataclasses import dataclass, field
@@ -44,7 +45,7 @@ _RETRY_DELAY = 2.0
 class SyncEntry:
     """A single sync request to be processed."""
 
-    files: list[str]
+    files: tuple[str, ...]
     message: str
 
 
@@ -79,7 +80,7 @@ class GitSync:
 
     sandbox: SandboxClient
     repo_url: str
-    token: str
+    token: str = field(repr=False)
     tracker_path: Path | None = None
     branch: str = "main"
 
@@ -146,6 +147,10 @@ class GitSync:
 
         if self._thread is not None:
             self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                logger.warning(
+                    "Git sync worker did not stop within %.1fs timeout", timeout
+                )
             self._thread = None
 
         logger.info(
@@ -164,7 +169,7 @@ class GitSync:
             logger.warning("Git sync not running, dropping sync request")
             return False
 
-        entry = SyncEntry(files=files, message=message)
+        entry = SyncEntry(files=tuple(files), message=message)
         try:
             self._queue.put_nowait(entry)
             return True
@@ -181,16 +186,27 @@ class GitSync:
         # Build authenticated URL
         auth_url = self._authenticated_url()
 
-        commands = [
+        # Configure git identity
+        config_commands = [
             "git config --global user.email 'nathan@netanel.systems'",
             "git config --global user.name 'Nathan'",
-            f"git clone {auth_url} /home/user/brain || true",
         ]
-
-        for cmd in commands:
+        for cmd in config_commands:
             result = self.sandbox.run_bash(cmd)
-            if result.exit_code != 0 and "already exists" not in (result.stderr or ""):
-                logger.error("Git init failed: %s → %s", cmd, result.stderr)
+            if result.exit_code != 0:
+                logger.error("Git config failed: %s → %s", cmd, result.stderr)
+                return False
+
+        # Clone repo — tolerate "already exists", fail on real errors
+        clone_result = self.sandbox.run_bash(
+            f"git clone {auth_url} /home/user/brain"
+        )
+        if clone_result.exit_code != 0:
+            stderr = clone_result.stderr or ""
+            if "already exists" in stderr:
+                logger.info("Brain repo already cloned, skipping clone")
+            else:
+                logger.error("Git clone failed: %s", stderr)
                 return False
 
         return True
@@ -240,7 +256,7 @@ class GitSync:
                 ))
                 return
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 last_error = str(exc)
                 logger.warning(
                     "Git sync attempt %d/%d failed: %s",
@@ -265,11 +281,13 @@ class GitSync:
 
     def _do_sync(self, entry: SyncEntry) -> str:
         """Execute git add + commit + push. Returns commit hash."""
-        files_str = " ".join(entry.files)
+        safe_files = " ".join(shlex.quote(f) for f in entry.files)
+        safe_message = shlex.quote(entry.message)
+        safe_branch = shlex.quote(self.branch)
 
         # Stage files
         add_result = self.sandbox.run_bash(
-            f"cd /home/user/brain && git add {files_str}"
+            f"cd /home/user/brain && git add {safe_files}"
         )
         if add_result.exit_code != 0:
             msg = f"git add failed: {add_result.stderr}"
@@ -286,7 +304,7 @@ class GitSync:
 
         # Commit
         commit_result = self.sandbox.run_bash(
-            f"cd /home/user/brain && git commit -m '{entry.message}'"
+            f"cd /home/user/brain && git commit -m {safe_message}"
         )
         if commit_result.exit_code != 0:
             msg = f"git commit failed: {commit_result.stderr}"
@@ -300,7 +318,7 @@ class GitSync:
 
         # Push
         push_result = self.sandbox.run_bash(
-            f"cd /home/user/brain && git push origin {self.branch}"
+            f"cd /home/user/brain && git push origin {safe_branch}"
         )
         if push_result.exit_code != 0:
             msg = f"git push failed: {push_result.stderr}"
@@ -320,7 +338,7 @@ class GitSync:
             self.tracker_path.parent.mkdir(parents=True, exist_ok=True)
             with self.tracker_path.open("a") as f:
                 f.write(json.dumps(asdict(result), default=str) + "\n")
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("Failed to log git sync result")
 
     @staticmethod

@@ -59,16 +59,21 @@ class TestSyncEntry:
     """Tests for SyncEntry dataclass."""
 
     def test_creation(self) -> None:
-        """SyncEntry stores files and message."""
-        entry = SyncEntry(files=["state.json"], message="cycle 1")
-        assert entry.files == ["state.json"]
+        """SyncEntry stores files as tuple and message."""
+        entry = SyncEntry(files=("state.json",), message="cycle 1")
+        assert entry.files == ("state.json",)
         assert entry.message == "cycle 1"
 
     def test_frozen(self) -> None:
         """SyncEntry is immutable."""
-        entry = SyncEntry(files=["state.json"], message="cycle 1")
+        entry = SyncEntry(files=("state.json",), message="cycle 1")
         with pytest.raises(AttributeError):
             entry.message = "changed"  # type: ignore[misc]
+
+    def test_files_is_tuple(self) -> None:
+        """SyncEntry.files must be a tuple for immutability."""
+        entry = SyncEntry(files=("a.txt", "b.txt"), message="test")
+        assert isinstance(entry.files, tuple)
 
 
 class TestSyncResult:
@@ -172,6 +177,48 @@ class TestQueue:
             "total_failures": 0,
             "queue_size": 0,
         }
+
+    def test_queue_full_returns_false(
+        self,
+        mock_sandbox: MagicMock,
+        tracker_path: Path,
+    ) -> None:
+        """Queuing to a full queue returns False."""
+        from social_agent.git_sync import _MAX_QUEUE_SIZE
+
+        sync = GitSync(
+            sandbox=mock_sandbox,
+            repo_url="https://github.com/org/repo",
+            token="tok",
+            tracker_path=tracker_path,
+            branch="main",
+        )
+        sync.start()
+        # Fill the queue without processing (worker will try to process,
+        # but with blocking side_effect we can fill first)
+        # Use a simpler approach: stop the worker, fill manually
+        sync.stop()
+
+        # Start again but immediately fill
+        sync._running = True  # Pretend running for queue_sync to accept
+        for i in range(_MAX_QUEUE_SIZE):
+            sync._queue.put_nowait(
+                SyncEntry(files=(f"file{i}.txt",), message=f"fill {i}")
+            )
+        # Queue is now full
+        result = sync.queue_sync(["overflow.txt"], "should fail")
+        assert result is False
+        sync._running = False
+
+    def test_queue_sync_converts_list_to_tuple(self, git_sync: GitSync) -> None:
+        """queue_sync converts file list to tuple internally."""
+        git_sync.start()
+        git_sync.queue_sync(["a.txt", "b.txt"], "test")
+        # Peek at the entry in the queue
+        entry = git_sync._queue.get_nowait()
+        assert isinstance(entry.files, tuple)
+        assert entry.files == ("a.txt", "b.txt")
+        git_sync.stop()
 
 
 # --- Sync processing tests ---
@@ -334,15 +381,53 @@ class TestInitRepo:
         """init_repo runs git config and clone commands."""
         result = git_sync.init_repo()
         assert result is True
-        # Should have called run_bash at least 3 times
-        assert mock_sandbox.run_bash.call_count >= 3
+        # 2 config commands + 1 clone = 3 calls
+        assert mock_sandbox.run_bash.call_count == 3
 
-    def test_init_repo_failure(
+    def test_init_repo_already_cloned(
         self,
         git_sync: GitSync,
         mock_sandbox: MagicMock,
     ) -> None:
-        """init_repo returns False on failure."""
+        """init_repo succeeds when repo already cloned."""
+        def side_effect(cmd: str) -> BashResult:
+            if "git clone" in cmd:
+                return BashResult(
+                    stdout="",
+                    stderr="fatal: destination path already exists",
+                    exit_code=128,
+                )
+            return BashResult(stdout="", stderr="", exit_code=0)
+
+        mock_sandbox.run_bash.side_effect = side_effect
+        result = git_sync.init_repo()
+        assert result is True
+
+    def test_init_repo_clone_failure(
+        self,
+        git_sync: GitSync,
+        mock_sandbox: MagicMock,
+    ) -> None:
+        """init_repo returns False on real clone failure."""
+        def side_effect(cmd: str) -> BashResult:
+            if "git clone" in cmd:
+                return BashResult(
+                    stdout="",
+                    stderr="fatal: repository not found",
+                    exit_code=128,
+                )
+            return BashResult(stdout="", stderr="", exit_code=0)
+
+        mock_sandbox.run_bash.side_effect = side_effect
+        result = git_sync.init_repo()
+        assert result is False
+
+    def test_init_repo_config_failure(
+        self,
+        git_sync: GitSync,
+        mock_sandbox: MagicMock,
+    ) -> None:
+        """init_repo returns False when git config fails."""
         mock_sandbox.run_bash.return_value = BashResult(
             stdout="", stderr="fatal: could not create", exit_code=128
         )
@@ -370,3 +455,8 @@ class TestAuthenticatedUrl:
         )
         url = sync._authenticated_url()
         assert url == "git@github.com:org/repo.git"
+
+    def test_token_excluded_from_repr(self, git_sync: GitSync) -> None:
+        """Token must not appear in repr output."""
+        r = repr(git_sync)
+        assert "ghp_test_token" not in r
