@@ -3,6 +3,7 @@
 from .agent import Action, ActivityRecord, Agent, AgentState, CycleResult
 from .brain import AgentBrain
 from .config import Settings, get_settings
+from .control import HealthCheck, HealthStatus, ProcessInfo, SandboxController, SandboxInfo
 from .dashboard import (
     ActionStats,
     DashboardData,
@@ -37,6 +38,8 @@ __all__ = [
     "EngagementResult",
     "ExecutionResult",
     "FeedResult",
+    "HealthCheck",
+    "HealthStatus",
     "HeartbeatResult",
     "Level",
     "MoltbookClient",
@@ -44,8 +47,11 @@ __all__ = [
     "NAMESPACES",
     "PROMPTS",
     "PostResult",
+    "ProcessInfo",
     "RegisterResult",
     "SandboxClient",
+    "SandboxController",
+    "SandboxInfo",
     "Settings",
     "TelegramNotifier",
     "build_dashboard",

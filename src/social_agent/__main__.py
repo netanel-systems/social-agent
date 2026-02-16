@@ -1,9 +1,15 @@
 """CLI entry point for the social agent.
 
 Usage:
-    python -m social_agent run       # Run the agent loop
-    python -m social_agent dashboard # Show dashboard metrics
-    python -m social_agent status    # Show current state only
+    python -m social_agent run                          # Run the agent loop
+    python -m social_agent dashboard                    # Show dashboard metrics
+    python -m social_agent status                       # Show current state only
+    python -m social_agent kill <sandbox_id>             # Kill a sandbox
+    python -m social_agent kill --all                    # Kill all sandboxes
+    python -m social_agent observe <sandbox_id>          # Observe sandbox state
+    python -m social_agent sandboxes                     # List active sandboxes
+    python -m social_agent inject-rule <id> "<rule>"     # Inject a rule
+    python -m social_agent processes <sandbox_id>        # List processes
 
 Environment:
     Reads from .env file (via pydantic-settings).
@@ -105,6 +111,99 @@ def cmd_dashboard(_args: argparse.Namespace) -> None:
     print(format_dashboard(data))  # noqa: T201
 
 
+def cmd_kill(args: argparse.Namespace) -> None:
+    """Kill a sandbox or all sandboxes."""
+    from social_agent.control import SandboxController
+
+    controller = SandboxController()
+    if args.all:
+        killed = controller.kill_all()
+        print(f"Killed {len(killed)} sandbox(es): {killed}")
+    elif args.sandbox_id:
+        result = controller.kill(args.sandbox_id)
+        if result:
+            print(f"Killed sandbox {args.sandbox_id}")
+        else:
+            print(f"Sandbox {args.sandbox_id} not found or already dead")
+            sys.exit(1)
+    else:
+        print("Error: provide <sandbox_id> or --all")
+        sys.exit(1)
+
+
+def cmd_observe(args: argparse.Namespace) -> None:
+    """Observe sandbox state, health, and recent activity."""
+    from social_agent.control import SandboxController
+
+    controller = SandboxController()
+    sandbox_id = args.sandbox_id
+
+    # Health
+    health = controller.check_health(sandbox_id)
+    print(f"Sandbox:  {health.sandbox_id}")
+    print(f"Status:   {health.status.value}")
+    if health.current_action:
+        print(f"Action:   {health.current_action}")
+    if health.seconds_since_heartbeat is not None:
+        print(f"Heartbeat: {health.seconds_since_heartbeat:.0f}s ago")
+    if health.error:
+        print(f"Error:    {health.error}")
+
+    # State
+    state = controller.read_state(sandbox_id)
+    if state:
+        print("\nState:")
+        for key, value in state.items():
+            print(f"  {key}: {value}")
+
+    # Recent activity
+    activity = controller.read_activity(sandbox_id, last_n=5)
+    if activity:
+        print(f"\nRecent activity ({len(activity)} records):")
+        for record in activity:
+            action = record.get("action", "?")
+            success = record.get("success", "?")
+            ts = record.get("timestamp", "?")
+            print(f"  [{ts}] {action} — success={success}")
+
+
+def cmd_sandboxes(_args: argparse.Namespace) -> None:
+    """List all active sandboxes."""
+    from social_agent.control import SandboxController
+
+    controller = SandboxController()
+    sandboxes = controller.list_sandboxes()
+    if not sandboxes:
+        print("No active sandboxes")
+        return
+    print(f"Active sandboxes ({len(sandboxes)}):")
+    for sbx in sandboxes:
+        print(f"  {sbx.sandbox_id} (template={sbx.template_id}, started={sbx.started_at})")
+
+
+def cmd_inject_rule(args: argparse.Namespace) -> None:
+    """Inject a rule into a sandbox's DOS.md."""
+    from social_agent.control import SandboxController
+
+    controller = SandboxController()
+    controller.inject_rule(args.sandbox_id, args.rule)
+    print(f"Rule injected into {args.sandbox_id}: {args.rule}")
+
+
+def cmd_processes(args: argparse.Namespace) -> None:
+    """List processes in a sandbox."""
+    from social_agent.control import SandboxController
+
+    controller = SandboxController()
+    processes = controller.list_processes(args.sandbox_id)
+    if not processes:
+        print(f"No processes found in {args.sandbox_id}")
+        return
+    print(f"Processes in {args.sandbox_id} ({len(processes)}):")
+    for proc in processes:
+        print(f"  PID {proc.pid}: {proc.cmd or '(unknown)'}")
+
+
 def cmd_status(_args: argparse.Namespace) -> None:
     """Show current agent state."""
     from social_agent.agent import AgentState
@@ -135,6 +234,23 @@ def main() -> None:
     subparsers.add_parser("dashboard", help="Show dashboard metrics")
     subparsers.add_parser("status", help="Show current state")
 
+    # Control plane commands
+    kill_parser = subparsers.add_parser("kill", help="Kill a sandbox")
+    kill_parser.add_argument("sandbox_id", nargs="?", help="Sandbox ID to kill")
+    kill_parser.add_argument("--all", action="store_true", help="Kill all sandboxes")
+
+    observe_parser = subparsers.add_parser("observe", help="Observe sandbox state")
+    observe_parser.add_argument("sandbox_id", help="Sandbox ID to observe")
+
+    subparsers.add_parser("sandboxes", help="List active sandboxes")
+
+    inject_parser = subparsers.add_parser("inject-rule", help="Inject a rule")
+    inject_parser.add_argument("sandbox_id", help="Sandbox ID")
+    inject_parser.add_argument("rule", help="Rule text to inject")
+
+    proc_parser = subparsers.add_parser("processes", help="List processes in sandbox")
+    proc_parser.add_argument("sandbox_id", help="Sandbox ID")
+
     args = parser.parse_args()
     _setup_logging(args.verbose)
 
@@ -142,6 +258,11 @@ def main() -> None:
         "run": cmd_run,
         "dashboard": cmd_dashboard,
         "status": cmd_status,
+        "kill": cmd_kill,
+        "observe": cmd_observe,
+        "sandboxes": cmd_sandboxes,
+        "inject-rule": cmd_inject_rule,
+        "processes": cmd_processes,
     }
 
     handler = commands.get(args.command)
