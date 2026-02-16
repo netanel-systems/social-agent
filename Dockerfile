@@ -27,8 +27,10 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 # Install dashboard dependencies only (minimal, no netanel-core)
 COPY requirements-dashboard.txt .
+COPY pyproject.toml .
 COPY src/ src/
-RUN pip install --no-cache-dir -r requirements-dashboard.txt
+RUN pip install --no-cache-dir -r requirements-dashboard.txt && \
+    pip install --no-cache-dir --no-deps -e .
 
 # Environment variables for nathan-brain
 ENV BRAIN_REPO_URL=https://github.com/netanel-systems/nathan-brain.git
