@@ -7,7 +7,7 @@ Follows boundary pattern: defaults, valid inputs, errors, edge cases.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,7 +19,6 @@ from social_agent.control import (
     SandboxController,
     SandboxInfo,
 )
-
 
 # --- Fixtures ---
 
@@ -58,7 +57,9 @@ class TestKill:
         assert result is False
 
     @patch("social_agent.control.Sandbox.kill")
-    def test_kill_no_api_key(self, mock_kill: MagicMock, controller_no_key: SandboxController) -> None:
+    def test_kill_no_api_key(
+        self, mock_kill: MagicMock, controller_no_key: SandboxController
+    ) -> None:
         """Kill works without explicit API key."""
         mock_kill.return_value = True
         result = controller_no_key.kill("sbx_123")
@@ -216,7 +217,9 @@ class TestReadState:
     """Tests for read_state()."""
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_read_state_success(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_read_state_success(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """Parses state.json correctly."""
         state = {"cycle_count": 42, "posts_today": 3}
         mock_sbx = MagicMock()
@@ -238,7 +241,9 @@ class TestReadActivity:
     """Tests for read_activity()."""
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_read_activity_success(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_read_activity_success(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """Parses JSONL activity correctly."""
         records = [
             {"action": "READ_FEED", "success": True, "timestamp": "2026-01-01T00:00:00Z"},
@@ -256,7 +261,9 @@ class TestReadActivity:
         assert result[1]["action"] == "CREATE_POST"
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_read_activity_empty(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_read_activity_empty(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """Returns empty list when activity log is empty."""
         mock_sbx = MagicMock()
         mock_sbx.files.read.return_value = ""
@@ -266,14 +273,18 @@ class TestReadActivity:
         assert result == []
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_read_activity_error(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_read_activity_error(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """Returns empty list on connection error."""
         mock_connect.side_effect = Exception("Not found")
         result = controller.read_activity("sbx_gone")
         assert result == []
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_read_activity_malformed_lines(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_read_activity_malformed_lines(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """Skips malformed JSONL lines."""
         content = '{"action": "READ_FEED"}\nNOT_JSON\n{"action": "REPLY"}'
         mock_sbx = MagicMock()
@@ -294,7 +305,9 @@ class TestReadActivity:
         assert result == []
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_read_activity_capped(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_read_activity_capped(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """last_n is capped at max_records."""
         records = [json.dumps({"action": f"ACT_{i}"}) for i in range(5)]
         content = "\n".join(records)
@@ -335,7 +348,9 @@ class TestInjectRule:
     def test_inject_override(self, mock_connect: MagicMock, controller: SandboxController) -> None:
         """Logs override to external_overrides.md."""
         mock_sbx = MagicMock()
-        mock_sbx.files.read.return_value = "# External Overrides\n\n| Timestamp | Author | Description |\n"
+        mock_sbx.files.read.return_value = (
+            "# External Overrides\n\n| Timestamp | Author | Description |\n"
+        )
         mock_connect.return_value = mock_sbx
 
         controller.inject_override("sbx_123", "Changed cycle interval")
@@ -346,7 +361,9 @@ class TestInjectRule:
         assert "External Control" in written
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_inject_override_creates_file(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_inject_override_creates_file(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """Creates external_overrides.md if it doesn't exist."""
         mock_sbx = MagicMock()
         mock_sbx.files.read.side_effect = Exception("File not found")
@@ -367,7 +384,9 @@ class TestMetrics:
     """Tests for get_metrics()."""
 
     @patch("social_agent.control.Sandbox.get_metrics")
-    def test_get_metrics_success(self, mock_metrics: MagicMock, controller: SandboxController) -> None:
+    def test_get_metrics_success(
+        self, mock_metrics: MagicMock, controller: SandboxController
+    ) -> None:
         """Returns parsed metrics."""
         m1 = MagicMock()
         m1.cpu = 45.2
@@ -381,7 +400,9 @@ class TestMetrics:
         assert result[0]["memory"] == 128.0
 
     @patch("social_agent.control.Sandbox.get_metrics")
-    def test_get_metrics_error(self, mock_metrics: MagicMock, controller: SandboxController) -> None:
+    def test_get_metrics_error(
+        self, mock_metrics: MagicMock, controller: SandboxController
+    ) -> None:
         """Returns empty list on error."""
         mock_metrics.side_effect = Exception("API error")
         result = controller.get_metrics("sbx_gone")
@@ -436,7 +457,9 @@ class TestProcessControl:
         assert result[0].cmd == "python"
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_list_processes_error(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_list_processes_error(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """Returns empty list on error."""
         mock_connect.side_effect = Exception("Not found")
         result = controller.list_processes("sbx_gone")
@@ -452,7 +475,7 @@ class TestCheckHealth:
     @patch("social_agent.control.Sandbox.connect")
     def test_healthy(self, mock_connect: MagicMock, controller: SandboxController) -> None:
         """HEALTHY when heartbeat is recent."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         heartbeat = {
             "timestamp": now.isoformat(),
             "current_action": "READ_FEED",
@@ -473,7 +496,7 @@ class TestCheckHealth:
     @patch("social_agent.control.Sandbox.connect")
     def test_stuck(self, mock_connect: MagicMock, controller: SandboxController) -> None:
         """STUCK when heartbeat is between thresholds."""
-        old_time = datetime.now(timezone.utc) - timedelta(seconds=120)
+        old_time = datetime.now(UTC) - timedelta(seconds=120)
         heartbeat = {
             "timestamp": old_time.isoformat(),
             "current_action": "RESEARCH",
@@ -488,9 +511,11 @@ class TestCheckHealth:
         assert result.seconds_since_heartbeat >= 60
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_dead_old_heartbeat(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_dead_old_heartbeat(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """DEAD when heartbeat is very old."""
-        old_time = datetime.now(timezone.utc) - timedelta(seconds=700)
+        old_time = datetime.now(UTC) - timedelta(seconds=700)
         heartbeat = {"timestamp": old_time.isoformat()}
         mock_sbx = MagicMock()
         mock_sbx.files.read.return_value = json.dumps(heartbeat)
@@ -500,7 +525,9 @@ class TestCheckHealth:
         assert result.status == HealthStatus.DEAD
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_dead_cannot_connect(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_dead_cannot_connect(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """DEAD when sandbox is not running and can't connect."""
         mock_connect.side_effect = Exception("Connection refused")
 
@@ -509,7 +536,9 @@ class TestCheckHealth:
         assert result.error is not None
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_unknown_no_timestamp(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_unknown_no_timestamp(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """UNKNOWN when heartbeat has no timestamp."""
         heartbeat = {"current_action": "STARTING", "timestamp": None}
         mock_sbx = MagicMock()
@@ -521,10 +550,12 @@ class TestCheckHealth:
         assert "no timestamp" in result.error.lower()
 
     @patch("social_agent.control.Sandbox.connect")
-    def test_custom_thresholds(self, mock_connect: MagicMock, controller: SandboxController) -> None:
+    def test_custom_thresholds(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
         """Custom thresholds work correctly."""
         # 30 seconds ago — healthy with default thresholds, stuck with custom
-        recent = datetime.now(timezone.utc) - timedelta(seconds=30)
+        recent = datetime.now(UTC) - timedelta(seconds=30)
         heartbeat = {"timestamp": recent.isoformat(), "current_action": "REPLY"}
         mock_sbx = MagicMock()
         mock_sbx.files.read.return_value = json.dumps(heartbeat)
