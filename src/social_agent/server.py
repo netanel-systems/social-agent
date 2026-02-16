@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import TYPE_CHECKING, Any
@@ -32,6 +33,8 @@ logger = logging.getLogger("social_agent.server")
 # Max activity records returned per request.
 _MAX_ACTIVITY_LIMIT = 200
 _DEFAULT_ACTIVITY_LIMIT = 50
+# Max request body size (64KB — ample for rule injection).
+_MAX_BODY_SIZE = 65536
 
 
 class _RequestHandler(BaseHTTPRequestHandler):
@@ -94,8 +97,8 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self) -> None:  # noqa: N802
         """Handle CORS preflight requests."""
-        self._send_cors_headers()
         self.send_response(204)
+        self._send_cors_headers()
         self.end_headers()
 
     # --- Public endpoints ---
@@ -242,17 +245,28 @@ class _RequestHandler(BaseHTTPRequestHandler):
             return False
 
         token = auth_header[len("Bearer "):]
-        if token != self.dashboard_token:
+        if not secrets.compare_digest(token, self.dashboard_token):
             self._send_json({"error": "Unauthorized"}, status=401)
             return False
 
         return True
 
     def _read_body(self) -> dict[str, Any] | None:
-        """Read and parse JSON request body."""
+        """Read and parse JSON request body.
+
+        Rejects bodies larger than _MAX_BODY_SIZE (64KB) to prevent
+        memory exhaustion from oversized payloads.
+        """
         content_length = int(self.headers.get("Content-Length", 0))
         if content_length <= 0:
             self._send_json({"error": "Empty request body"}, status=400)
+            return None
+
+        if content_length > _MAX_BODY_SIZE:
+            self._send_json(
+                {"error": f"Request body too large (max {_MAX_BODY_SIZE} bytes)"},
+                status=413,
+            )
             return None
 
         try:
@@ -335,7 +349,14 @@ class DashboardServer:
 
     @property
     def port(self) -> int:
-        """Server port."""
+        """Server port.
+
+        When the server is running, returns the actual bound port
+        (useful when initialized with port=0 to let the OS pick).
+        Otherwise returns the configured port.
+        """
+        if self._server is not None:
+            return self._server.server_address[1]
         return self._port
 
     def _make_handler(self) -> type[_RequestHandler]:

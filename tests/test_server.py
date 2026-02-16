@@ -144,9 +144,8 @@ def server(
 
 
 def _base_url(srv: DashboardServer) -> str:
-    """Get base URL for server."""
-    actual_port = srv._server.server_address[1]
-    return f"http://127.0.0.1:{actual_port}"
+    """Get base URL for server using the public port property."""
+    return f"http://127.0.0.1:{srv.port}"
 
 
 # --- Status endpoint ---
@@ -473,3 +472,96 @@ class TestAdminAuth:
             )
             assert status == 403
             assert "disabled" in body["error"].lower()
+
+
+# --- Body size limit ---
+
+
+class TestBodySizeLimit:
+    """Tests for request body size enforcement."""
+
+    def test_oversized_body_rejected(
+        self, server: DashboardServer
+    ) -> None:
+        """Request body exceeding _MAX_BODY_SIZE returns 413."""
+        import urllib.error
+        import urllib.request
+
+        # Build a payload larger than 64KB
+        oversized = {"rule": "x" * 70000}
+        raw = json.dumps(oversized).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"{_base_url(server)}/api/inject-rule",
+            method="POST",
+        )
+        req.add_header("Authorization", "Bearer test-secret-token")
+        req.add_header("Content-Type", "application/json")
+        req.data = raw
+
+        try:
+            with urllib.request.urlopen(req) as resp:
+                status = resp.status
+                body = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            status = e.code
+            body = json.loads(e.read().decode("utf-8"))
+
+        assert status == 413
+        assert "too large" in body["error"].lower()
+
+
+# --- Port property ---
+
+
+class TestPortProperty:
+    """Tests for port property behavior."""
+
+    def test_port_returns_actual_bound_port(
+        self,
+        mock_controller: MagicMock,
+        tmp_state: Path,
+        tmp_activity: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Port property returns OS-assigned port when running with port=0."""
+        srv = DashboardServer(
+            sandbox_id="sbx_test",
+            controller=mock_controller,
+            state_path=tmp_state,
+            activity_log_path=tmp_activity,
+            heartbeat_path=tmp_path / "heartbeat.json",
+            port=0,
+        )
+        # Before start, returns configured port
+        assert srv.port == 0
+
+        srv.start()
+        try:
+            time.sleep(0.1)
+            # After start, returns actual bound port (non-zero)
+            assert srv.port > 0
+            assert srv.port != 0
+        finally:
+            srv.stop()
+
+        # After stop, returns configured port again
+        assert srv.port == 0
+
+    def test_port_returns_configured_when_explicit(
+        self,
+        mock_controller: MagicMock,
+        tmp_state: Path,
+        tmp_activity: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Port property returns configured port when not using port=0."""
+        srv = DashboardServer(
+            sandbox_id="sbx_test",
+            controller=mock_controller,
+            state_path=tmp_state,
+            activity_log_path=tmp_activity,
+            heartbeat_path=tmp_path / "heartbeat.json",
+            port=9999,
+        )
+        assert srv.port == 9999
