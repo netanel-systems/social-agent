@@ -46,7 +46,7 @@ EXPOSE 8080
 CMD set -e && \
     if [ ! -d "$BRAIN_REPO_PATH" ]; then \
         echo "Cloning nathan-brain..."; \
-        git clone "$BRAIN_REPO_URL" "$BRAIN_REPO_PATH"; \
+        git clone "https://${GITHUB_TOKEN}@github.com/netanel-systems/nathan-brain.git" "$BRAIN_REPO_PATH"; \
     else \
         echo "nathan-brain already exists"; \
     fi && \
