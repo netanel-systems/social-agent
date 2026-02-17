@@ -36,6 +36,7 @@ _MAX_MIGRATIONS_PER_DAY = 10
 _DEFAULT_MIGRATION_THRESHOLD_S = 300  # 5 minutes before expiry
 _DEFAULT_VERIFY_TIMEOUT_S = 120  # 2 minutes to verify successor
 _DEFAULT_VERIFY_POLL_INTERVAL_S = 5  # Poll every 5 seconds
+_SANDBOX_TIMEOUT_S = 3600  # 1 hour — watchdog re-deploys if agent dies
 
 
 @dataclass(frozen=True)
@@ -139,9 +140,15 @@ class LifecycleManager:
             return None
 
         try:
-            sandbox = Sandbox.create(api_key=self.e2b_api_key)
+            sandbox = Sandbox.create(
+                api_key=self.e2b_api_key,
+                timeout=_SANDBOX_TIMEOUT_S,
+            )
             new_id = sandbox.sandbox_id
-            logger.info("Created successor sandbox: %s", new_id)
+            logger.info(
+                "Created successor sandbox: %s (timeout=%ds)",
+                new_id, _SANDBOX_TIMEOUT_S,
+            )
             return new_id
         except Exception:
             logger.exception("Failed to create successor sandbox")
