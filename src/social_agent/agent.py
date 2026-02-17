@@ -207,7 +207,7 @@ class Agent:
             if settings.git_sync_enabled and settings.brain_repo_url:
                 from social_agent.git_push import push_state
 
-                brain_path = _Path("~/nathan-brain").expanduser()
+                brain_path = self._state_path.resolve().parent
                 push_state(brain_path, f"agent startup: sandbox_id={self._sandbox_id}")
 
     @property
