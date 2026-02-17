@@ -224,10 +224,12 @@ def test_agent_init_resets_consecutive_failures(
     """Agent init resets consecutive_failures to 0 from saved state.
 
     A new sandbox must not inherit failure debt from a dead predecessor.
-    Persistent fields (cycle_count, posts_today) are preserved.
+    Persistent fields (cycle_count, posts_today, replies_today) are preserved.
     """
     # Simulate state.json left by a previous dead run
-    stale_state = AgentState(consecutive_failures=5, cycle_count=10, posts_today=2)
+    stale_state = AgentState(
+        consecutive_failures=5, cycle_count=10, posts_today=2, replies_today=7
+    )
     stale_state.save(tmp_dir / "state.json")
 
     agent = Agent(
@@ -245,6 +247,7 @@ def test_agent_init_resets_consecutive_failures(
     # Persistent fields preserved
     assert agent.state.cycle_count == 10
     assert agent.state.posts_today == 2
+    assert agent.state.replies_today == 7
 
 
 # --- should_continue ---
