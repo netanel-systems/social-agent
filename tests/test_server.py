@@ -810,3 +810,122 @@ class TestCost:
         assert body["within_budget"] is False
         assert body["budget_remaining_usd"] == 0.0
         assert body["alert_triggered"] is True
+
+
+# --- Discovery worker ---
+
+
+class TestDiscoveryWorker:
+    """Tests for the background sandbox discovery worker."""
+
+    def test_discovery_worker_updates_sandbox_id(
+        self,
+        mock_controller: MagicMock,
+        tmp_state: Path,
+        tmp_activity: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Discovery worker updates _sandbox_id when new active sandbox found."""
+        import threading
+        from unittest.mock import patch
+
+        brain_path = tmp_path / "brain"
+        brain_path.mkdir()
+
+        # Signal event when get_active_sandbox_id is called
+        called = threading.Event()
+
+        def fake_get_active(path: object, **kwargs: object) -> str:
+            called.set()
+            return "sbx_new_discovered"
+
+        srv = DashboardServer(
+            sandbox_id="sbx_test",
+            controller=mock_controller,
+            brain_repo_path=brain_path,
+            state_path=tmp_state,
+            activity_log_path=tmp_activity,
+            heartbeat_path=tmp_path / "heartbeat.json",
+            port=0,
+        )
+
+        with (
+            patch("social_agent.server.time.sleep"),
+            patch(
+                "social_agent.server.get_active_sandbox_id",
+                side_effect=fake_get_active,
+            ),
+        ):
+            srv.start()
+            called.wait(timeout=2.0)
+            # Give the worker thread one tick to complete the assignment
+            import time as _time
+            _time.sleep(0.05)
+            assert srv._sandbox_id == "sbx_new_discovered"
+            srv.stop()
+
+    def test_discovery_worker_ignores_placeholder(
+        self,
+        mock_controller: MagicMock,
+        tmp_state: Path,
+        tmp_activity: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Discovery worker does not update sandbox_id for sbx-not-started."""
+        import threading
+        from unittest.mock import patch
+
+        brain_path = tmp_path / "brain"
+        brain_path.mkdir()
+
+        called = threading.Event()
+
+        def fake_get_active(path: object, **kwargs: object) -> str:
+            called.set()
+            return "sbx-not-started"
+
+        srv = DashboardServer(
+            sandbox_id="sbx_test",
+            controller=mock_controller,
+            brain_repo_path=brain_path,
+            state_path=tmp_state,
+            activity_log_path=tmp_activity,
+            heartbeat_path=tmp_path / "heartbeat.json",
+            port=0,
+        )
+
+        with (
+            patch("social_agent.server.time.sleep"),
+            patch(
+                "social_agent.server.get_active_sandbox_id",
+                side_effect=fake_get_active,
+            ),
+        ):
+            srv.start()
+            called.wait(timeout=2.0)
+            import time as _time
+            _time.sleep(0.05)
+            # Should remain unchanged — placeholder is ignored
+            assert srv._sandbox_id == "sbx_test"
+            srv.stop()
+
+    def test_no_discovery_without_brain_repo_path(
+        self,
+        mock_controller: MagicMock,
+        tmp_state: Path,
+        tmp_activity: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Discovery worker does not start when brain_repo_path is None."""
+        srv = DashboardServer(
+            sandbox_id="sbx_test",
+            controller=mock_controller,
+            brain_repo_path=None,
+            state_path=tmp_state,
+            activity_log_path=tmp_activity,
+            heartbeat_path=tmp_path / "heartbeat.json",
+            port=0,
+        )
+        with srv:
+            assert srv._discovery_thread is None
+            assert not srv._discovery_running
