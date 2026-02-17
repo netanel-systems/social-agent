@@ -145,7 +145,10 @@ class SandboxController:
         """
         result = []
         paginator = Sandbox.list(**self._api_params())
-        while paginator.has_next:
+        max_pages = 100  # Defensive bound — prevents infinite loop on API misbehaviour
+        page_count = 0
+        while paginator.has_next and page_count < max_pages:
+            page_count += 1
             for sbx_info in paginator.next_items():
                 result.append(
                     SandboxInfo(
@@ -155,6 +158,8 @@ class SandboxController:
                         metadata=getattr(sbx_info, "metadata", {}),
                     )
                 )
+        if page_count >= max_pages:
+            logger.warning("list_sandboxes: reached max page limit (%d)", max_pages)
         return result
 
     # --- File I/O ---

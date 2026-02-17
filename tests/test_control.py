@@ -210,6 +210,39 @@ class TestListSandboxes:
         mock_list.return_value = mock_paginator
         assert controller.list_sandboxes() == []
 
+    @patch("social_agent.control.Sandbox.list")
+    def test_list_multiple_pages(self, mock_list: MagicMock, controller: SandboxController) -> None:
+        """Accumulates sandboxes across multiple paginator pages."""
+        sbx1 = MagicMock()
+        sbx1.sandbox_id = "sbx_1"
+        sbx1.template_id = "tmpl"
+        sbx1.started_at = "2026-01-01"
+        sbx1.metadata = {}
+        sbx2 = MagicMock()
+        sbx2.sandbox_id = "sbx_2"
+        sbx2.template_id = "tmpl"
+        sbx2.started_at = "2026-01-02"
+        sbx2.metadata = {}
+
+        mock_paginator = MagicMock()
+        pages = [[sbx1], [sbx2]]
+        page_idx = [0]
+
+        def _next_pages() -> list[MagicMock]:
+            items = pages[page_idx[0]]
+            page_idx[0] += 1
+            return items
+
+        # Property-based has_next: True until all pages consumed
+        type(mock_paginator).has_next = property(lambda self: page_idx[0] < len(pages))
+        mock_paginator.next_items = _next_pages
+        mock_list.return_value = mock_paginator
+
+        result = controller.list_sandboxes()
+        assert len(result) == 2
+        assert result[0].sandbox_id == "sbx_1"
+        assert result[1].sandbox_id == "sbx_2"
+
 
 # --- File I/O tests ---
 
