@@ -46,7 +46,7 @@ _MAX_BODY_SIZE = 65536
 # Discovery worker interval, placeholder value, and safety cap.
 _DISCOVERY_INTERVAL_S = 120
 _DISCOVERY_PLACEHOLDER = "sbx-not-started"
-# 10,000 × 120s ≈ 13 days. Prevents infinite loop if stop event fails.
+# 10,000 x 120s = ~13 days. Prevents infinite loop if stop event fails.
 _MAX_DISCOVERY_ITERATIONS = 10_000
 
 
@@ -561,7 +561,7 @@ class DashboardServer:
         class so subsequent requests use the new sandbox.
 
         Bounded by _MAX_DISCOVERY_ITERATIONS (JPL Rule 1 — no unbounded loops).
-        At 120s per iteration this is ~13 days; the watchdog redeployes long
+        At 120s per iteration this is ~13 days; the watchdog redeploys long
         before this limit is reached in practice.
         """
         iterations = 0
