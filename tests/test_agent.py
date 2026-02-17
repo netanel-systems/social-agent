@@ -1107,7 +1107,6 @@ def test_heartbeat_on_decision_failure(
 def test_reply_feed_rotated_on_quality_failure(
     agent: Agent,
     mock_brain: MagicMock,
-    mock_moltbook: MagicMock,
 ) -> None:
     """Feed is rotated even when quality gate blocks the reply.
 

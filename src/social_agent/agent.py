@@ -348,7 +348,11 @@ class Agent:
             parts.append("NOTE: No feed loaded yet. Consider READ_FEED first.")
         if not self._research_context:
             parts.append("NOTE: No research done yet. Consider RESEARCH before CREATE_POST.")
-        elif self._state.posts_today == 0 and self._state.cycle_count > 3:
+        elif (
+            self._state.posts_today == 0
+            and self._state.cycle_count > 3
+            and self._state.posts_today < self._settings.max_posts_per_day
+        ):
             parts.append(
                 "HINT: Research is available and no post created today. Strongly consider CREATE_POST."
             )
