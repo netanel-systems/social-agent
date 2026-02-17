@@ -193,6 +193,7 @@ class Agent:
         self._shutdown_requested = False
         self._recent_feed: list[MoltbookPost] = []
         self._research_context: str = ""
+        self._research_miss_count: int = 0  # Consecutive empty RESEARCH results (in-memory)
 
         self._activity_log_path.parent.mkdir(parents=True, exist_ok=True)
         self._heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
@@ -291,6 +292,10 @@ class Agent:
         else:
             self._state.consecutive_failures += 1
 
+        # Reset research miss counter on any non-RESEARCH successful action
+        if result.success and action != Action.RESEARCH:
+            self._research_miss_count = 0
+
         # Heartbeat: signal action complete
         self._write_heartbeat("IDLE")
         self._state.save(self._state_path)
@@ -371,7 +376,13 @@ class Agent:
         if not self._recent_feed:
             parts.append("NOTE: No feed loaded yet. Consider READ_FEED first.")
         if not self._research_context:
-            parts.append("NOTE: No research done yet. Consider RESEARCH before CREATE_POST.")
+            if self._research_miss_count >= self._settings.research_miss_threshold:
+                parts.append(
+                    "NOTE: Recent RESEARCH attempts returned no results. "
+                    "Skip RESEARCH and choose CREATE_POST or REPLY using your existing knowledge."
+                )
+            else:
+                parts.append("NOTE: No research done yet. Consider RESEARCH before CREATE_POST.")
         elif (
             self._state.posts_today == 0
             and self._state.cycle_count > 3
@@ -461,11 +472,25 @@ class Agent:
             return CycleResult(action="RESEARCH", success=False, details=details)
 
         # Run web search in sandbox
-        search_results = self._sandbox_web_search(query)
-        if not search_results:
-            details = f"No results for: {query}"
+        search_ok, search_results, search_error = self._sandbox_web_search(query)
+
+        # Branch 1: Genuine infrastructure failure — circuit breaker eligible
+        if not search_ok:
+            details = f"Search failed: {search_error}"
             self._log_activity("RESEARCH", success=False, details=details)
+            self._notify(details, "warning")
             return CycleResult(action="RESEARCH", success=False, details=details)
+
+        # Branch 2: Sandbox ran fine, DDGS found nothing — soft-skip
+        if not search_results:
+            self._research_miss_count += 1
+            details = f"Research returned no results — skipped (query: {query})"
+            self._log_activity("RESEARCH", success=True, details=details)
+            self._notify(details, "info")
+            return CycleResult(action="RESEARCH", success=True, details=details)
+
+        # Branch 3: Success with results — reset miss counter, store context
+        self._research_miss_count = 0
 
         # Store research context for future posts/replies
         self._research_context = (
@@ -501,16 +526,23 @@ class Agent:
                 return line.strip()[:100]
         return ""
 
-    def _sandbox_web_search(self, query: str) -> list[dict[str, str]]:
+    def _sandbox_web_search(
+        self, query: str
+    ) -> tuple[bool, list[dict[str, str]], str]:
         """Run a DuckDuckGo search inside the E2B sandbox.
 
-        Returns list of dicts with 'title', 'body', 'url' keys.
+        Returns (success, results, error_message):
+        - (False, [], "reason") — genuine infrastructure failure (sandbox down, parse error)
+        - (True, [], "")        — sandbox ran fine, DDGS found nothing (soft-skip)
+        - (True, [...], "")     — results found
+
         Bounded to _MAX_SEARCH_RESULTS. All execution in sandbox.
         """
         if self._sandbox is None:
-            return []
+            return (False, [], "No sandbox available")
 
         # Build search code — safe: query is embedded as repr()
+        # DDGS exceptions (rate-limit, network) emit empty list — treated as content gap.
         search_code = (
             "from duckduckgo_search import DDGS\n"
             "import json\n"
@@ -523,23 +555,24 @@ class Agent:
             '                "body": r.get("body", ""),\n'
             '                "url": r.get("href", ""),\n'
             "            })\n"
-            "except Exception as e:\n"
-            '    results = [{"title": "Search error", "body": str(e), "url": ""}]\n'
+            "except Exception:\n"
+            "    results = []\n"
             "print(json.dumps(results))\n"
         )
 
         result = self._sandbox.execute_code(search_code)
         if not result.success or not result.stdout:
             logger.warning("Sandbox search failed: %s", result.error)
-            return []
+            return (False, [], f"Sandbox execution failed: {result.error or 'no output'}")
 
         try:
             parsed = json.loads(result.stdout[-1])
             if isinstance(parsed, list):
-                return parsed  # type: ignore[return-value]
+                return (True, parsed, "")  # type: ignore[return-value]
         except (json.JSONDecodeError, IndexError):
             logger.warning("Could not parse search results")
-        return []
+            return (False, [], "Could not parse search results")
+        return (False, [], "Unexpected search response format")
 
     def _act_create_post(self) -> CycleResult:
         """Generate and publish an original post."""

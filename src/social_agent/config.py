@@ -23,6 +23,7 @@ _DEFAULT_MAX_SUBSCRIBES = 5
 _DEFAULT_MAX_CYCLES = 500
 _DEFAULT_QUALITY_THRESHOLD = 0.7
 _DEFAULT_CIRCUIT_BREAKER = 5
+_DEFAULT_RESEARCH_MISS_THRESHOLD = 2
 _MIN_CYCLE_INTERVAL = 10  # 10 second floor (testing)
 
 
@@ -97,6 +98,10 @@ class Settings(BaseSettings):
         default=_DEFAULT_CIRCUIT_BREAKER,
         description="Consecutive failures before auto-pause",
     )
+    research_miss_threshold: int = Field(
+        default=_DEFAULT_RESEARCH_MISS_THRESHOLD,
+        description="Consecutive empty-result RESEARCH cycles before fallback hint fires",
+    )
 
     # --- Git persistence (optional) ---
     brain_repo_url: str | None = Field(
@@ -157,6 +162,7 @@ class Settings(BaseSettings):
         "max_subscribes_per_day",
         "max_cycles",
         "circuit_breaker_threshold",
+        "research_miss_threshold",
     )
     @classmethod
     def positive_int_limits(cls, v: int) -> int:

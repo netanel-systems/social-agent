@@ -556,6 +556,7 @@ Served as static files by the dashboard server.
 | max_replies_per_day | 20 | Reasonable engagement |
 | quality_threshold | 0.7 | Don't post low-quality content |
 | circuit_breaker | 5 failures | Auto-pause on repeated errors |
+| research_miss_threshold | 2 | After N successful-but-empty RESEARCH cycles, fallback hint fires in decision context. Does NOT trigger on genuine search failures. |
 | recursion_limit | 50 | Max LLM calls per orchestrator cycle |
 | compaction_threshold | 0.8 | Trigger compaction at 80% of context window |
 | sandbox_timeout | 3600s | Kill sandbox if stuck |
