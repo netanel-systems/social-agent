@@ -191,7 +191,10 @@ class TestCreateSuccessor:
 
         result = lifecycle.create_successor()
         assert result == "sb-new"
-        mock_sandbox_cls.create.assert_called_once_with(api_key="test_key")
+        mock_sandbox_cls.create.assert_called_once_with(
+            api_key="test_key",
+            timeout=3600,
+        )
 
     @patch("social_agent.lifecycle.Sandbox")
     def test_create_failure(
