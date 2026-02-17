@@ -298,6 +298,30 @@ class TestDeploySelf:
             assert envs.get("OPENAI_API_KEY") == "sk-test"
             assert envs.get("MOLTBOOK_API_KEY") == "mb-test"
 
+    def test_deploy_injects_agent_sandbox_id(
+        self,
+        lifecycle: LifecycleManager,
+        mock_controller: MagicMock,
+    ) -> None:
+        """AGENT_SANDBOX_ID is injected so the agent tracks the outer sandbox.
+
+        Fix (Issue #59): agent was tracking the inner execution sandbox
+        (SandboxClient) in current_sandbox_id.  Dashboard checks the outer
+        sandbox for heartbeat — path mismatch caused DEAD on every health check.
+        """
+        lifecycle.deploy_self(
+            "sb-outer-123",
+            "https://github.com/org/brain",
+            "ghp_token",
+        )
+        # All commands must receive AGENT_SANDBOX_ID = the outer sandbox
+        for call in (
+            *mock_controller.run_command.call_args_list,
+            *mock_controller.start_background_command.call_args_list,
+        ):
+            envs = call.kwargs.get("envs", {})
+            assert envs.get("AGENT_SANDBOX_ID") == "sb-outer-123"
+
     def test_deploy_agent_start_uses_background_command(
         self,
         lifecycle: LifecycleManager,
