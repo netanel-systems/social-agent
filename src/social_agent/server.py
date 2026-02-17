@@ -19,7 +19,6 @@ import logging
 import mimetypes
 import secrets
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path as _PathLib
 from typing import TYPE_CHECKING, Any
@@ -450,6 +449,7 @@ class DashboardServer:
         self._handler_class: type[_RequestHandler] | None = None
         self._discovery_running: bool = False
         self._discovery_thread: threading.Thread | None = None
+        self._discovery_stop = threading.Event()
 
     @property
     def is_running(self) -> bool:
@@ -512,6 +512,7 @@ class DashboardServer:
         """Stop the server gracefully."""
         if self._discovery_running:
             self._discovery_running = False
+            self._discovery_stop.set()
             if self._discovery_thread is not None:
                 self._discovery_thread.join(timeout=5)
                 self._discovery_thread = None
@@ -532,6 +533,7 @@ class DashboardServer:
         if self._brain_repo_path is None or self._discovery_running:
             return
 
+        self._discovery_stop.clear()
         self._discovery_running = True
         self._discovery_thread = threading.Thread(
             target=self._discovery_worker,
@@ -552,8 +554,7 @@ class DashboardServer:
         class so subsequent requests use the new sandbox.
         """
         while self._discovery_running:
-            time.sleep(_DISCOVERY_INTERVAL_S)
-            if not self._discovery_running:
+            if self._discovery_stop.wait(_DISCOVERY_INTERVAL_S):
                 break
 
             if self._brain_repo_path is None:

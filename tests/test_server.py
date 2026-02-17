@@ -835,7 +835,7 @@ class TestDiscoveryWorker:
         # Signal event when get_active_sandbox_id is called
         called = threading.Event()
 
-        def fake_get_active(path: object, **kwargs: object) -> str:
+        def fake_get_active(_path: object, **_kwargs: object) -> str:
             called.set()
             return "sbx_new_discovered"
 
@@ -850,7 +850,7 @@ class TestDiscoveryWorker:
         )
 
         with (
-            patch("social_agent.server.time.sleep"),
+            patch.object(srv._discovery_stop, "wait", return_value=False),
             patch(
                 "social_agent.server.get_active_sandbox_id",
                 side_effect=fake_get_active,
@@ -880,7 +880,7 @@ class TestDiscoveryWorker:
 
         called = threading.Event()
 
-        def fake_get_active(path: object, **kwargs: object) -> str:
+        def fake_get_active(_path: object, **_kwargs: object) -> str:
             called.set()
             return "sbx-not-started"
 
@@ -895,7 +895,7 @@ class TestDiscoveryWorker:
         )
 
         with (
-            patch("social_agent.server.time.sleep"),
+            patch.object(srv._discovery_stop, "wait", return_value=False),
             patch(
                 "social_agent.server.get_active_sandbox_id",
                 side_effect=fake_get_active,
