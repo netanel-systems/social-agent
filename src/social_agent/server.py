@@ -70,6 +70,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         """Handle GET requests — API routes, static files, and index."""
+        # Snapshot sandbox_id at request entry so one request always sees
+        # a consistent ID, even if the discovery worker updates it mid-flight.
+        self.sandbox_id = type(self).sandbox_id
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
@@ -102,6 +105,8 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         """Handle POST requests (admin actions)."""
+        # Snapshot sandbox_id at request entry for consistent reads.
+        self.sandbox_id = type(self).sandbox_id
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
 

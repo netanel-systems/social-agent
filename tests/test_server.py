@@ -850,7 +850,7 @@ class TestDiscoveryWorker:
         )
 
         with (
-            patch.object(srv._discovery_stop, "wait", return_value=False),
+            patch("social_agent.server._DISCOVERY_INTERVAL_S", 0.01),
             patch(
                 "social_agent.server.get_active_sandbox_id",
                 side_effect=fake_get_active,
@@ -858,7 +858,8 @@ class TestDiscoveryWorker:
         ):
             srv.start()
             called.wait(timeout=2.0)
-            # Give the worker thread one tick to complete the assignment
+            # Give the worker one tick to complete the assignment after
+            # calling get_active_sandbox_id (which sets the event).
             import time as _time
             _time.sleep(0.05)
             assert srv._sandbox_id == "sbx_new_discovered"
@@ -895,7 +896,7 @@ class TestDiscoveryWorker:
         )
 
         with (
-            patch.object(srv._discovery_stop, "wait", return_value=False),
+            patch("social_agent.server._DISCOVERY_INTERVAL_S", 0.01),
             patch(
                 "social_agent.server.get_active_sandbox_id",
                 side_effect=fake_get_active,
