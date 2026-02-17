@@ -29,6 +29,7 @@ def mock_controller() -> MagicMock:
     ctrl.write_file.return_value = None
     ctrl.inject_override.return_value = None
     ctrl.run_command.return_value = ""
+    ctrl.start_background_command.return_value = None
     return ctrl
 
 
@@ -210,19 +211,24 @@ class TestCreateSuccessor:
 class TestDeploySelf:
     """Tests for deploying agent to new sandbox."""
 
-    def test_deploy_runs_three_commands(
+    def test_deploy_runs_two_foreground_and_one_background_command(
         self,
         lifecycle: LifecycleManager,
         mock_controller: MagicMock,
     ) -> None:
-        """Deploy runs exactly 3 commands via run_command (not write_file)."""
+        """Deploy runs 2 blocking commands then 1 background command.
+
+        pip install and git clone use run_command (blocking).
+        Agent start uses start_background_command (non-blocking).
+        """
         result = lifecycle.deploy_self(
             "sb-new",
             "https://github.com/org/brain",
             "ghp_token",
         )
         assert result is True
-        assert mock_controller.run_command.call_count == 3
+        assert mock_controller.run_command.call_count == 2
+        assert mock_controller.start_background_command.call_count == 1
         # The old broken placeholder must NOT be called
         mock_controller.write_file.assert_not_called()
 
@@ -240,6 +246,10 @@ class TestDeploySelf:
         for call in mock_controller.run_command.call_args_list:
             cmd = call.args[1] if len(call.args) > 1 else call.kwargs.get("command", "")
             assert "ghp_super_secret_token" not in cmd
+        # Background command also must not expose the token
+        for call in mock_controller.start_background_command.call_args_list:
+            cmd = call.args[1] if len(call.args) > 1 else call.kwargs.get("command", "")
+            assert "ghp_super_secret_token" not in cmd
 
     def test_deploy_token_injected_as_env(
         self,
@@ -252,8 +262,13 @@ class TestDeploySelf:
             "https://github.com/org/brain",
             "ghp_token123",
         )
-        # Every run_command call should have GH_TOKEN in envs
+        # Foreground commands must have GH_TOKEN in envs
         for call in mock_controller.run_command.call_args_list:
+            envs = call.kwargs.get("envs", {})
+            assert "GH_TOKEN" in envs
+            assert envs["GH_TOKEN"] == "ghp_token123"  # noqa: S105
+        # Background command also has GH_TOKEN
+        for call in mock_controller.start_background_command.call_args_list:
             envs = call.kwargs.get("envs", {})
             assert "GH_TOKEN" in envs
             assert envs["GH_TOKEN"] == "ghp_token123"  # noqa: S105
@@ -263,7 +278,7 @@ class TestDeploySelf:
         lifecycle: LifecycleManager,
         mock_controller: MagicMock,
     ) -> None:
-        """Extra envs (API keys) are passed through to all run_command calls."""
+        """Extra envs (API keys) are passed through to all commands."""
         lifecycle.deploy_self(
             "sb-new",
             "https://github.com/org/brain",
@@ -274,6 +289,46 @@ class TestDeploySelf:
             envs = call.kwargs.get("envs", {})
             assert envs.get("OPENAI_API_KEY") == "sk-test"
             assert envs.get("MOLTBOOK_API_KEY") == "mb-test"
+        # Background command also receives extra envs
+        for call in mock_controller.start_background_command.call_args_list:
+            envs = call.kwargs.get("envs", {})
+            assert envs.get("OPENAI_API_KEY") == "sk-test"
+            assert envs.get("MOLTBOOK_API_KEY") == "mb-test"
+
+    def test_deploy_agent_start_uses_background_command(
+        self,
+        lifecycle: LifecycleManager,
+        mock_controller: MagicMock,
+    ) -> None:
+        """The agent start step must use start_background_command, not run_command."""
+        lifecycle.deploy_self(
+            "sb-new",
+            "https://github.com/org/brain",
+            "ghp_token",
+        )
+        # start_background_command called exactly once (agent start)
+        mock_controller.start_background_command.assert_called_once()
+        # The command must include the agent run invocation
+        call_args = mock_controller.start_background_command.call_args
+        cmd = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs.get("command", "")
+        assert "social_agent run" in cmd
+        # Verify nohup and trailing & are no longer needed (background=True handles it)
+        assert "nohup" not in cmd
+        assert cmd.rstrip().endswith("2>&1")  # No trailing & for shell backgrounding
+
+    def test_deploy_failure_on_agent_start_error(
+        self,
+        lifecycle: LifecycleManager,
+        mock_controller: MagicMock,
+    ) -> None:
+        """Deploy returns False when start_background_command raises."""
+        mock_controller.start_background_command.side_effect = RuntimeError("E2B error")
+        result = lifecycle.deploy_self(
+            "sb-new",
+            "https://github.com/org/brain",
+            "ghp_token",
+        )
+        assert result is False
 
     def test_deploy_failure_on_run_command_error(
         self,

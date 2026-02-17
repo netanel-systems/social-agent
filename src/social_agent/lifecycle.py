@@ -182,8 +182,9 @@ class LifecycleManager:
         else:
             deploy_envs["BRAIN_REPO_URL_AUTH"] = repo_url
 
-        # Tuples of (command, timeout_seconds, log_label)
-        steps = [
+        # Tuples of (command, timeout_seconds | None, log_label).
+        # timeout=None means non-blocking — use start_background_command.
+        steps: list[tuple[str, int | None, str]] = [
             (
                 "pip install"
                 " 'git+https://${GH_TOKEN}@github.com/netanel-systems/social-agent.git"
@@ -198,21 +199,28 @@ class LifecycleManager:
             ),
             (
                 "cd /home/user/brain &&"
-                " nohup python -m social_agent run"
-                " > /home/user/brain/agent.log 2>&1 &",
-                10,
+                " python -m social_agent run"
+                " > /home/user/brain/agent.log 2>&1",
+                None,  # Non-blocking — process runs indefinitely
                 "start agent process",
             ),
         ]
 
         for cmd, timeout, label in steps:
             try:
-                self.controller.run_command(
-                    sandbox_id,
-                    cmd,
-                    timeout=timeout,
-                    envs=deploy_envs,
-                )
+                if timeout is None:
+                    self.controller.start_background_command(
+                        sandbox_id,
+                        cmd,
+                        envs=deploy_envs,
+                    )
+                else:
+                    self.controller.run_command(
+                        sandbox_id,
+                        cmd,
+                        timeout=timeout,
+                        envs=deploy_envs,
+                    )
                 logger.info("Deploy step OK: %s on %s", label, sandbox_id)
             except Exception:
                 logger.exception("Deploy failed at [%s] on %s", label, sandbox_id)
