@@ -670,7 +670,15 @@ Phase 5: Architecture Sync + Polish
   Step 14:   Architecture Doc Update (status table)             DONE
   Step 15:   Dashboard Deploy + Revenue Readiness               DONE
 
-Total: 416 tests across 14 test files, 0 lint errors
+Total: 430 tests across 14 test files, 0 lint errors
+
+Issue #39 (deploy_self fix) — RESOLVED:
+  - run_command() added to SandboxController (actually executes commands)
+  - deploy_self() rewritten: installs from GitHub private repo, clones brain, starts agent
+  - Token injection via envs dict (never embedded in command strings)
+  - __init__.py: AgentBrain eager import removed (fixes watchdog ModuleNotFoundError)
+  - watchdog_check.py: envs dict passed to deploy_self, api_key= constructor fix
+  - watchdog.yml: pip install -e ".[agent]", all secrets exposed
 ```
 
 ### Dependency Graph

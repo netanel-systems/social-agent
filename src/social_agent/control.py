@@ -338,6 +338,41 @@ class SandboxController:
             logger.warning("list_processes: Failed for %s: %s", sandbox_id, e)
             return []
 
+    # --- Command execution ---
+
+    def run_command(
+        self,
+        sandbox_id: str,
+        command: str,
+        *,
+        timeout: int = 60,
+        envs: dict[str, str] | None = None,
+    ) -> str:
+        """Run a shell command inside a sandbox and return stdout.
+
+        Args:
+            sandbox_id: Target sandbox.
+            command: Shell command to execute.
+            timeout: Maximum seconds to wait (default 60).
+            envs: Environment variables to inject into the command.
+
+        Returns:
+            Command stdout as string.
+
+        Raises:
+            RuntimeError: If the command exits with non-zero status.
+        """
+        sbx = Sandbox.connect(sandbox_id, **self._api_params())
+        result = sbx.commands.run(command, timeout=timeout, envs=envs or {})
+        if result.exit_code != 0:
+            raise RuntimeError(f"exit {result.exit_code}: {result.stderr}")
+        logger.info(
+            "run_command: [%s] exit=0 in %s",
+            command[:50].replace("\n", " "),
+            sandbox_id,
+        )
+        return result.stdout
+
     # --- Health check ---
 
     def check_health(

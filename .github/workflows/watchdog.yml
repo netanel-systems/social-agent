@@ -25,11 +25,20 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -e .
+        run: pip install -e ".[agent]"
 
       - name: Run watchdog check
         env:
           E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
           BRAIN_REPO_URL: ${{ secrets.BRAIN_REPO_URL }}
           GITHUB_TOKEN: ${{ secrets.BRAIN_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_TRACING: ${{ secrets.LANGSMITH_TRACING }}
+          LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
+          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+          GIT_SYNC_ENABLED: ${{ secrets.GIT_SYNC_ENABLED }}
         run: python scripts/watchdog_check.py

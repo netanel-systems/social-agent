@@ -443,3 +443,80 @@ class TestRunWatchdog:
 
         result = run_watchdog(config)
         assert result.action == "cleaned"
+
+
+# --- WatchdogConfig envs tests ---
+
+
+class TestWatchdogConfigEnvs:
+    """Tests for envs dict in WatchdogConfig."""
+
+    def test_from_env_collects_optional_secrets(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """from_env() collects optional secrets into envs dict."""
+        monkeypatch.setenv("E2B_API_KEY", "key1")
+        monkeypatch.setenv("BRAIN_REPO_URL", "https://example.com/brain")
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_tok")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        monkeypatch.setenv("MOLTBOOK_API_KEY", "mb-test")
+        monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
+
+        cfg = WatchdogConfig.from_env()
+        assert cfg.envs.get("OPENAI_API_KEY") == "sk-test"
+        assert cfg.envs.get("MOLTBOOK_API_KEY") == "mb-test"
+        assert cfg.envs.get("E2B_API_KEY") == "key1"
+        # Missing vars not included (no empty strings)
+        assert "LANGSMITH_API_KEY" not in cfg.envs
+
+    def test_from_env_empty_optional_vars_excluded(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Optional vars set to empty string are excluded from envs."""
+        monkeypatch.setenv("E2B_API_KEY", "key1")
+        monkeypatch.setenv("BRAIN_REPO_URL", "https://example.com/brain")
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_tok")
+        monkeypatch.setenv("OPENAI_API_KEY", "")  # empty — should be excluded
+
+        cfg = WatchdogConfig.from_env()
+        assert "OPENAI_API_KEY" not in cfg.envs
+
+    def test_envs_passed_to_deploy_self_on_no_sandboxes(
+        self, mock_lifecycle: MagicMock
+    ) -> None:
+        """envs from config are forwarded to deploy_self when deploying fresh sandbox."""
+        cfg = WatchdogConfig(
+            e2b_api_key="k",
+            brain_repo_url="https://example.com/brain",
+            github_token="ghp_tok",  # noqa: S106
+            envs={"OPENAI_API_KEY": "sk-test"},
+        )
+        _handle_no_sandboxes(mock_lifecycle, cfg)
+        _, call_kwargs = mock_lifecycle.deploy_self.call_args
+        assert call_kwargs.get("envs", {}).get("OPENAI_API_KEY") == "sk-test"
+
+    def test_sandbox_controller_uses_api_key_param(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """SandboxController is constructed with api_key= (not e2b_api_key=)."""
+        monkeypatch.setenv("E2B_API_KEY", "key1")
+        monkeypatch.setenv("BRAIN_REPO_URL", "https://example.com/brain")
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_tok")
+
+        with (
+            patch("scripts.watchdog_check.SandboxController") as mock_ctrl_cls,
+            patch("scripts.watchdog_check.LifecycleManager") as mock_lm_cls,
+        ):
+            mock_ctrl = MagicMock()
+            mock_ctrl.list_sandboxes.return_value = []
+            mock_ctrl_cls.return_value = mock_ctrl
+            mock_lm = MagicMock()
+            mock_lm.create_successor.return_value = "sb-new"
+            mock_lm.deploy_self.return_value = True
+            mock_lm_cls.return_value = mock_lm
+
+            cfg = WatchdogConfig.from_env()
+            run_watchdog(cfg)
+
+            # Must use api_key=, not e2b_api_key=
+            mock_ctrl_cls.assert_called_once_with(api_key="key1")
