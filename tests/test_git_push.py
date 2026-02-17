@@ -9,27 +9,13 @@ Verifies that push_state:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from social_agent.git_push import (
     _GIT_AUTHOR_EMAIL,
     _GIT_AUTHOR_NAME,
     push_state,
 )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_mock_run(returncode: int = 0) -> MagicMock:
-    """Return a mock for subprocess.run that succeeds by default."""
-    mock = MagicMock()
-    mock.returncode = returncode
-    return mock
 
 
 # ---------------------------------------------------------------------------
@@ -82,12 +68,13 @@ def test_push_state_config_before_commit(mock_run: MagicMock, tmp_path: Path) ->
     """git config calls come BEFORE git commit."""
     push_state(tmp_path, "startup commit")
 
-    calls = mock_run.call_args_list
-    commands = [" ".join(c.args[0]) for c in calls]
+    commands = [" ".join(c.args[0]) for c in mock_run.call_args_list]
 
-    config_idx = next(
-        i for i, cmd in enumerate(commands) if "config" in cmd
-    )
+    # Assert both calls exist before computing indices (avoids StopIteration)
+    assert any("config" in cmd for cmd in commands), "git config not called"
+    assert any("commit" in cmd for cmd in commands), "git commit not called"
+
+    config_idx = next(i for i, cmd in enumerate(commands) if "config" in cmd)
     commit_idx = next(i for i, cmd in enumerate(commands) if "commit" in cmd)
 
     assert config_idx < commit_idx, "config must come before commit"
