@@ -2,6 +2,7 @@
 # Serves the public dashboard for monitoring the agent.
 #
 # Auto-discovers active sandbox from nathan-brain repository.
+# Updated: 2026-02-16 - Force rebuild
 #
 # Build:  docker build -t nathan-dashboard .
 # Run:    docker run -p 8080:8080 \
