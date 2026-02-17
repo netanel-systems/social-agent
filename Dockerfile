@@ -46,10 +46,11 @@ EXPOSE 8080
 
 # Entrypoint: clone nathan-brain if needed, then start server
 CMD set -e && \
+    PORT=${PORT:-8080} && \
     if [ ! -d "$BRAIN_REPO_PATH" ]; then \
         echo "Cloning nathan-brain..."; \
         git clone "https://${GITHUB_TOKEN}@github.com/netanel-systems/nathan-brain.git" "$BRAIN_REPO_PATH"; \
     else \
         echo "nathan-brain already exists"; \
     fi && \
-    python -m social_agent serve --brain-repo "$BRAIN_REPO_PATH" --port "${PORT}"
+    python -m social_agent serve --brain-repo "$BRAIN_REPO_PATH" --port "$PORT"
