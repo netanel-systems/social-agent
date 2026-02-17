@@ -87,7 +87,16 @@ def cmd_run(args: argparse.Namespace) -> None:
 
     try:
         with sandbox:
-            # Agent created after sandbox start so we have sandbox_id
+            # Prefer AGENT_SANDBOX_ID (the outer sandbox where the agent runs,
+            # injected by the watchdog/lifecycle) over the inner execution sandbox
+            # ID returned by SandboxClient.  This ensures the heartbeat written
+            # to /home/user/brain/heartbeat.json matches what the dashboard reads.
+            import os as _os
+            tracked_sandbox_id = (
+                _os.environ.get("AGENT_SANDBOX_ID")
+                or sandbox.sandbox_id
+                or ""
+            )
             agent = Agent(
                 settings=settings,
                 brain=brain,
@@ -97,7 +106,7 @@ def cmd_run(args: argparse.Namespace) -> None:
                 state_path=Path("state.json"),
                 activity_log_path=Path("logs/activity.jsonl"),
                 heartbeat_path=Path("heartbeat.json"),
-                sandbox_id=sandbox.sandbox_id or "",
+                sandbox_id=tracked_sandbox_id,
             )
             if shutdown_requested:
                 agent.request_shutdown()

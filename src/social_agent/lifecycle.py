@@ -182,6 +182,11 @@ class LifecycleManager:
         # Merge provided envs; inject token as env vars (not in command strings)
         deploy_envs: dict[str, str] = dict(envs or {})
         deploy_envs["GH_TOKEN"] = github_token
+        # Inject the OUTER sandbox ID so the agent can track it for health checks.
+        # The agent creates an inner execution sandbox (SandboxClient) but the
+        # heartbeat is written in the OUTER sandbox.  Without this, the dashboard
+        # tracks the inner sandbox ID and can never read the heartbeat.
+        deploy_envs["AGENT_SANDBOX_ID"] = sandbox_id
         if repo_url.startswith("https://"):
             deploy_envs["BRAIN_REPO_URL_AUTH"] = repo_url.replace(
                 "https://", f"https://{github_token}@", 1
