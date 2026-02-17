@@ -1099,3 +1099,82 @@ def test_heartbeat_on_decision_failure(
     heartbeat = json.loads(heartbeat_path.read_text())
     # After failed decision, action should be IDLE
     assert heartbeat["current_action"] == "IDLE"
+
+
+# --- Issue #47: fix REPLY loop ---
+
+
+def test_reply_feed_rotated_on_quality_failure(
+    agent: Agent,
+    mock_brain: MagicMock,
+) -> None:
+    """Feed is rotated even when quality gate blocks the reply.
+
+    Fix 1: Prevents consecutive_failures from accumulating on a single
+    low-quality post by always rotating before the quality check.
+    """
+    agent._recent_feed = _feed_posts(3)
+    mock_brain.call.return_value = _brain_result("ok", 0.1)  # below threshold
+
+    result = agent._act_reply()
+
+    assert result.success is False
+    assert agent._state.replies_today == 0
+    # Feed must have advanced — the bad post is gone
+    assert len(agent.recent_feed) == 2
+
+
+def test_reply_feed_rotated_on_api_failure(
+    agent: Agent,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+) -> None:
+    """Feed is rotated even when the Moltbook API call fails.
+
+    Fix 1 (second case): API failure should also advance the feed
+    so the next cycle picks a different post.
+    """
+    agent._recent_feed = _feed_posts(2)
+    mock_brain.call.return_value = _brain_result("Solid reply", 0.85)
+    mock_moltbook.reply.return_value = PostResult(success=False, error="Network error")
+
+    result = agent._act_reply()
+
+    assert result.success is False
+    # Feed still advanced — different post next cycle
+    assert len(agent.recent_feed) == 1
+
+
+def test_decision_context_create_post_hint_when_no_post_today(
+    agent: Agent,
+) -> None:
+    """CREATE_POST hint shown when research available but no post made today.
+
+    Fix 2: After cycle 3, if research is loaded and posts_today == 0,
+    the context adds a strong CREATE_POST directive.
+    """
+    agent._research_context = "Some research about AI agents"
+    agent._state.posts_today = 0
+    agent._state.cycle_count = 5  # Past cycle 3
+
+    context = agent._build_decision_context()
+
+    assert "CREATE_POST" in context
+    assert "Strongly consider" in context
+
+
+def test_decision_context_no_create_post_hint_when_post_already_made(
+    agent: Agent,
+) -> None:
+    """CREATE_POST hint NOT shown when agent already posted today.
+
+    Fix 2 boundary: If posts_today > 0, the hint must not appear.
+    """
+    agent._research_context = "Some research about AI agents"
+    agent._state.posts_today = 1
+    agent._state.cycle_count = 5
+
+    context = agent._build_decision_context()
+
+    # Hint should not fire when post already made
+    assert "Strongly consider CREATE_POST" not in context

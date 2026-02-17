@@ -37,3 +37,29 @@ def test_prompts_not_empty() -> None:
 def test_namespaces_matches_prompts_keys() -> None:
     """NAMESPACES list is exactly the PROMPTS keys (same order)."""
     assert list(PROMPTS.keys()) == NAMESPACES
+
+
+# --- Issue #47: decision balance ---
+
+
+def test_decide_prompt_no_reply_preference_bias() -> None:
+    """moltbook-decide prompt must not prefer REPLY over CREATE_POST.
+
+    Fix 3 (Issue #47): The original prompt said "Prefer replying to
+    high-quality posts over creating new ones", which caused the LLM to
+    always pick REPLY. This directive must be gone.
+    """
+    decide = PROMPTS["moltbook-decide"]
+    assert "Prefer replying" not in decide
+
+
+def test_decide_prompt_includes_create_post_directive() -> None:
+    """moltbook-decide prompt must include a CREATE_POST directive.
+
+    Fix 3 (Issue #47): At least one original post per day to establish
+    presence — the agent must not be reply-only.
+    """
+    decide = PROMPTS["moltbook-decide"]
+    assert "CREATE_POST" in decide
+    # Directive exists instructing at least one post per day
+    assert "original" in decide.lower()
