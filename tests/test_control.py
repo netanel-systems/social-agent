@@ -231,10 +231,11 @@ class TestListSandboxes:
         def _next_pages() -> list[MagicMock]:
             items = pages[page_idx[0]]
             page_idx[0] += 1
+            if page_idx[0] >= len(pages):
+                mock_paginator.has_next = False
             return items
 
-        # Property-based has_next: True until all pages consumed
-        type(mock_paginator).has_next = property(lambda _: page_idx[0] < len(pages))
+        mock_paginator.has_next = True
         mock_paginator.next_items = _next_pages
         mock_list.return_value = mock_paginator
 
