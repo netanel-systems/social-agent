@@ -190,11 +190,15 @@ var Dashboard = (function () {
             var successText = r.success ? "OK" : "FAIL";
             var quality = r.quality_score ? " (q=" + r.quality_score.toFixed(2) + ")" : "";
 
+            var detailText = successText + quality;
+            if (r.details) {
+                detailText += " — " + r.details;
+            }
             html += '<div class="feed-item">'
                 + '<span class="feed-time">' + escapeHtml(formatTime(r.timestamp)) + '</span>'
                 + '<span class="feed-action ' + successClass + '">'
                 + escapeHtml(r.action || "?") + '</span>'
-                + '<span class="feed-detail">' + escapeHtml(successText + quality) + '</span>'
+                + '<span class="feed-detail">' + escapeHtml(detailText) + '</span>'
                 + '</div>';
         }
         feed.innerHTML = html;

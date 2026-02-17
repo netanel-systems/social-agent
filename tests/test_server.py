@@ -639,6 +639,18 @@ class TestStaticFiles:
         assert "javascript" in content_type or "text/" in content_type
         assert "Dashboard" in body
 
+    def test_js_renders_details_field(self, server: DashboardServer) -> None:
+        """dashboard.js includes r.details in feed item rendering.
+
+        Fix 4 (Issue #47): The details field of ActivityRecord must be
+        shown in the activity feed so operators can see what the agent did.
+        """
+        status, body, _ = _fetch_raw(
+            f"{_base_url(server)}/static/dashboard.js"
+        )
+        assert status == 200
+        assert "r.details" in body
+
     def test_missing_static_returns_404(
         self, server: DashboardServer
     ) -> None:

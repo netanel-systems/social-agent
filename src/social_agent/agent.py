@@ -348,6 +348,10 @@ class Agent:
             parts.append("NOTE: No feed loaded yet. Consider READ_FEED first.")
         if not self._research_context:
             parts.append("NOTE: No research done yet. Consider RESEARCH before CREATE_POST.")
+        elif self._state.posts_today == 0 and self._state.cycle_count > 3:
+            parts.append(
+                "HINT: Research is available and no post created today. Strongly consider CREATE_POST."
+            )
         return "\n".join(parts)
 
     # --- Action handlers ---
@@ -585,8 +589,11 @@ class Agent:
             self._log_activity("REPLY", success=False, details=details)
             return CycleResult(action="REPLY", success=False, details=details)
 
-        # Pick first post from feed
+        # Pick first post and rotate immediately — whether success or fail, we
+        # never retry the same post.  This prevents consecutive_failures from
+        # accumulating on a single low-quality post.
         post = self._recent_feed[0]
+        self._recent_feed = self._recent_feed[1:]
         context = (
             f"Reply to this post:\n"
             f"Title: {post.title}\n"
@@ -624,7 +631,6 @@ class Agent:
             )
 
         self._state.replies_today += 1
-        self._recent_feed = self._recent_feed[1:]  # Rotate feed
         details = f"Replied to: {post.title[:50]}"
         self._log_activity(
             "REPLY",

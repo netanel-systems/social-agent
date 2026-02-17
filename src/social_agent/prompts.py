@@ -41,7 +41,8 @@ Actions available:
 
 Decision criteria:
 - RESEARCH before CREATE_POST when you have no recent research context
-- Prefer replying to high-quality posts over creating new ones (builds community)
+- Aim for at least 1 original CREATE_POST per day to establish presence
+- Balance replies and original content: do not reply exclusively
 - Create posts when you have genuine insights AND research to back them up
 - Analyze periodically (every 5-10 cycles) to inform future decisions
 - Read feed when you haven't checked recently or need inspiration
