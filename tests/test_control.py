@@ -802,3 +802,75 @@ class TestRunCommand:
 
         controller.run_command("sbx_123", "pwd")
         mock_connect.assert_called_once_with("sbx_123", api_key="test-key")
+
+
+class TestStartBackgroundCommand:
+    """Tests for start_background_command() — fires a long-running process and returns immediately."""
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_passes_background_true_to_sdk(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """SDK is called with background=True so the call returns immediately."""
+        mock_sbx = MagicMock()
+        mock_connect.return_value = mock_sbx
+
+        controller.start_background_command("sbx_123", "python -m social_agent run")
+
+        mock_sbx.commands.run.assert_called_once_with(
+            "python -m social_agent run", background=True, envs={}
+        )
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_envs_forwarded_to_sdk(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """envs dict is passed through to commands.run()."""
+        mock_sbx = MagicMock()
+        mock_connect.return_value = mock_sbx
+
+        controller.start_background_command(
+            "sbx_123",
+            "python -m social_agent run",
+            envs={"FOO": "bar"},
+        )
+
+        mock_sbx.commands.run.assert_called_once_with(
+            "python -m social_agent run", background=True, envs={"FOO": "bar"}
+        )
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_none_envs_defaults_to_empty_dict(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """envs=None is treated as empty dict."""
+        mock_sbx = MagicMock()
+        mock_connect.return_value = mock_sbx
+
+        controller.start_background_command("sbx_123", "cmd", envs=None)
+
+        mock_sbx.commands.run.assert_called_once_with("cmd", background=True, envs={})
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_returns_none(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """Returns None — caller does not need the CommandHandle."""
+        mock_sbx = MagicMock()
+        mock_connect.return_value = mock_sbx
+
+        result = controller.start_background_command("sbx_123", "cmd")
+
+        assert result is None
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_uses_api_key(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """Connects to sandbox with the configured API key."""
+        mock_sbx = MagicMock()
+        mock_connect.return_value = mock_sbx
+
+        controller.start_background_command("sbx_123", "cmd")
+
+        mock_connect.assert_called_once_with("sbx_123", api_key="test-key")

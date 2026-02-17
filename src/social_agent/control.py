@@ -380,6 +380,32 @@ class SandboxController:
         )
         return result.stdout
 
+    def start_background_command(
+        self,
+        sandbox_id: str,
+        command: str,
+        *,
+        envs: dict[str, str] | None = None,
+    ) -> None:
+        """Start a long-running command in the background and return immediately.
+
+        Uses E2B's ``background=True`` mode which returns a ``CommandHandle``
+        without waiting for the process to exit.  Use this for the agent start
+        step where the process is expected to run indefinitely.
+
+        Args:
+            sandbox_id: Target sandbox.
+            command: Shell command to execute.
+            envs: Environment variables to inject into the command.
+        """
+        sbx = Sandbox.connect(sandbox_id, **self._api_params())
+        sbx.commands.run(command, background=True, envs=envs or {})
+        logger.info(
+            "start_background_command: [%s] started in %s",
+            command[:50].replace("\n", " "),
+            sandbox_id,
+        )
+
     # --- Health check ---
 
     def check_health(
