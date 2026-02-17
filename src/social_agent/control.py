@@ -144,15 +144,17 @@ class SandboxController:
             List of SandboxInfo for each running sandbox.
         """
         result = []
-        for sbx_info in Sandbox.list(**self._api_params()):
-            result.append(
-                SandboxInfo(
-                    sandbox_id=sbx_info.sandbox_id,
-                    template_id=getattr(sbx_info, "template_id", None),
-                    started_at=getattr(sbx_info, "started_at", None),
-                    metadata=getattr(sbx_info, "metadata", {}),
+        paginator = Sandbox.list(**self._api_params())
+        while paginator.has_next:
+            for sbx_info in paginator.next_items():
+                result.append(
+                    SandboxInfo(
+                        sandbox_id=sbx_info.sandbox_id,
+                        template_id=getattr(sbx_info, "template_id", None),
+                        started_at=getattr(sbx_info, "started_at", None),
+                        metadata=getattr(sbx_info, "metadata", {}),
+                    )
                 )
-            )
         return result
 
     # --- File I/O ---
