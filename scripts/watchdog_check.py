@@ -15,6 +15,12 @@ Environment variables required:
     BRAIN_REPO_URL: nathan-brain repo URL
     GITHUB_TOKEN: GitHub token for cloning brain repo
 
+Environment variables injected into new sandboxes (optional but needed
+for the agent to function fully):
+    OPENAI_API_KEY, MOLTBOOK_API_KEY, TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHAT_ID, LANGSMITH_API_KEY, LANGSMITH_TRACING,
+    LANGSMITH_PROJECT, DASHBOARD_TOKEN, GIT_SYNC_ENABLED
+
 Exit codes:
     0: Agent is healthy (or successfully recovered)
     1: Recovery failed
@@ -55,6 +61,8 @@ class WatchdogConfig:
     brain_repo_url: str
     github_token: str
     stuck_threshold_s: float = _STUCK_THRESHOLD_S
+    # All secrets to inject when deploying a new sandbox
+    envs: dict = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> WatchdogConfig:
@@ -79,10 +87,28 @@ class WatchdogConfig:
             logger.error("Missing required env vars: %s", ", ".join(missing))
             sys.exit(2)
 
+        # Collect all secrets to inject into new sandboxes
+        inject_keys = (
+            "E2B_API_KEY",
+            "OPENAI_API_KEY",
+            "MOLTBOOK_API_KEY",
+            "TELEGRAM_BOT_TOKEN",
+            "TELEGRAM_CHAT_ID",
+            "LANGSMITH_TRACING",
+            "LANGSMITH_API_KEY",
+            "LANGSMITH_PROJECT",
+            "GITHUB_TOKEN",
+            "DASHBOARD_TOKEN",
+            "GIT_SYNC_ENABLED",
+            "BRAIN_REPO_URL",
+        )
+        envs = {k: v for k in inject_keys if (v := os.environ.get(k, ""))}
+
         return cls(
             e2b_api_key=e2b_key,
             brain_repo_url=brain_url,
             github_token=gh_token,
+            envs=envs,
         )
 
 
@@ -95,7 +121,7 @@ def run_watchdog(config: WatchdogConfig) -> WatchdogResult:
     Returns:
         WatchdogResult describing what action was taken.
     """
-    controller = SandboxController(e2b_api_key=config.e2b_api_key)
+    controller = SandboxController(api_key=config.e2b_api_key)
     lifecycle = LifecycleManager(
         controller=controller,
         e2b_api_key=config.e2b_api_key,
@@ -130,6 +156,7 @@ def _handle_no_sandboxes(
         new_id,
         config.brain_repo_url,
         config.github_token,
+        envs=config.envs,
     )
     if not deployed:
         lifecycle.controller.kill(new_id)
@@ -178,6 +205,7 @@ def _handle_one_sandbox(
             new_id,
             config.brain_repo_url,
             config.github_token,
+            envs=config.envs,
         )
         if not deployed:
             lifecycle.controller.kill(new_id)
@@ -257,6 +285,7 @@ def _handle_multiple_sandboxes(
             new_id,
             config.brain_repo_url,
             config.github_token,
+            envs=config.envs,
         )
         if not deployed:
             lifecycle.controller.kill(new_id)

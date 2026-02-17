@@ -28,6 +28,7 @@ def mock_controller() -> MagicMock:
     ctrl.kill.return_value = True
     ctrl.write_file.return_value = None
     ctrl.inject_override.return_value = None
+    ctrl.run_command.return_value = ""
     return ctrl
 
 
@@ -209,33 +210,99 @@ class TestCreateSuccessor:
 class TestDeploySelf:
     """Tests for deploying agent to new sandbox."""
 
-    def test_deploy_writes_commands(
+    def test_deploy_runs_three_commands(
         self,
         lifecycle: LifecycleManager,
         mock_controller: MagicMock,
     ) -> None:
-        """Deploy writes command files to sandbox."""
+        """Deploy runs exactly 3 commands via run_command (not write_file)."""
         result = lifecycle.deploy_self(
             "sb-new",
             "https://github.com/org/brain",
             "ghp_token",
         )
         assert result is True
-        assert mock_controller.write_file.call_count == 3
+        assert mock_controller.run_command.call_count == 3
+        # The old broken placeholder must NOT be called
+        mock_controller.write_file.assert_not_called()
 
-    def test_deploy_failure(
+    def test_deploy_token_not_in_command_strings(
         self,
         lifecycle: LifecycleManager,
         mock_controller: MagicMock,
     ) -> None:
-        """Deploy returns False on write failure."""
-        mock_controller.write_file.side_effect = RuntimeError("write failed")
+        """GitHub token must not appear as a literal in any command string."""
+        lifecycle.deploy_self(
+            "sb-new",
+            "https://github.com/org/brain",
+            "ghp_super_secret_token",
+        )
+        for call in mock_controller.run_command.call_args_list:
+            cmd = call.args[1] if len(call.args) > 1 else call.kwargs.get("command", "")
+            assert "ghp_super_secret_token" not in cmd
+
+    def test_deploy_token_injected_as_env(
+        self,
+        lifecycle: LifecycleManager,
+        mock_controller: MagicMock,
+    ) -> None:
+        """Token is injected as GH_TOKEN env var, not embedded in commands."""
+        lifecycle.deploy_self(
+            "sb-new",
+            "https://github.com/org/brain",
+            "ghp_token123",
+        )
+        # Every run_command call should have GH_TOKEN in envs
+        for call in mock_controller.run_command.call_args_list:
+            envs = call.kwargs.get("envs", {})
+            assert "GH_TOKEN" in envs
+            assert envs["GH_TOKEN"] == "ghp_token123"
+
+    def test_deploy_extra_envs_passed_through(
+        self,
+        lifecycle: LifecycleManager,
+        mock_controller: MagicMock,
+    ) -> None:
+        """Extra envs (API keys) are passed through to all run_command calls."""
+        lifecycle.deploy_self(
+            "sb-new",
+            "https://github.com/org/brain",
+            "ghp_token",
+            envs={"OPENAI_API_KEY": "sk-test", "MOLTBOOK_API_KEY": "mb-test"},
+        )
+        for call in mock_controller.run_command.call_args_list:
+            envs = call.kwargs.get("envs", {})
+            assert envs.get("OPENAI_API_KEY") == "sk-test"
+            assert envs.get("MOLTBOOK_API_KEY") == "mb-test"
+
+    def test_deploy_failure_on_run_command_error(
+        self,
+        lifecycle: LifecycleManager,
+        mock_controller: MagicMock,
+    ) -> None:
+        """Deploy returns False when run_command raises."""
+        mock_controller.run_command.side_effect = RuntimeError("E2B error")
         result = lifecycle.deploy_self(
             "sb-new",
             "https://github.com/org/brain",
             "ghp_token",
         )
         assert result is False
+
+    def test_deploy_failure_on_second_command(
+        self,
+        lifecycle: LifecycleManager,
+        mock_controller: MagicMock,
+    ) -> None:
+        """Deploy returns False when the second command fails."""
+        mock_controller.run_command.side_effect = [None, RuntimeError("git failed"), None]
+        result = lifecycle.deploy_self(
+            "sb-new",
+            "https://github.com/org/brain",
+            "ghp_token",
+        )
+        assert result is False
+        assert mock_controller.run_command.call_count == 2  # stopped at second
 
 
 # --- Verify successor tests ---
@@ -374,7 +441,7 @@ class TestMigrate:
         mock_instance = MagicMock()
         mock_instance.sandbox_id = "sb-new"
         mock_sandbox_cls.create.return_value = mock_instance
-        mock_controller.write_file.side_effect = RuntimeError("fail")
+        mock_controller.run_command.side_effect = RuntimeError("fail")
 
         result = lifecycle.migrate("sb-old", "url", "tok")
         assert result.success is False

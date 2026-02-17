@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import shlex
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -152,46 +153,73 @@ class LifecycleManager:
         sandbox_id: str,
         repo_url: str,
         github_token: str,
+        envs: dict[str, str] | None = None,
     ) -> bool:
         """Deploy the agent to a new sandbox.
 
-        Clones the brain repo and starts the agent process.
+        Installs social-agent from the private GitHub repo, clones the brain
+        repo, and starts the agent process in the background.
+
+        The github_token is injected as GH_TOKEN and BRAIN_REPO_URL_AUTH env
+        vars — never embedded as a literal in command strings — to keep tokens
+        out of logs.
 
         Args:
             sandbox_id: Target sandbox ID.
-            repo_url: Brain repo URL.
-            github_token: GitHub token for clone auth.
+            repo_url: Brain repo URL (nathan-brain).
+            github_token: GitHub token for pip install + git clone auth.
+            envs: Additional environment variables to inject (API keys, etc.).
 
         Returns:
-            True if deployment succeeded.
+            True if all deployment steps succeeded.
         """
-        import shlex
+        # Merge provided envs; inject token as env vars (not in command strings)
+        deploy_envs: dict[str, str] = dict(envs or {})
+        deploy_envs["GH_TOKEN"] = github_token
+        if repo_url.startswith("https://"):
+            deploy_envs["BRAIN_REPO_URL_AUTH"] = repo_url.replace(
+                "https://", f"https://{github_token}@", 1
+            )
+        else:
+            deploy_envs["BRAIN_REPO_URL_AUTH"] = shlex.quote(repo_url)
 
-        auth_url = repo_url.replace(
-            "https://", f"https://{github_token}@", 1
-        ) if repo_url.startswith("https://") else repo_url
-
-        commands = [
-            "pip install social-agent",
-            f"git clone {shlex.quote(auth_url)} /home/user/brain",
-            "cd /home/user/brain && python -m social_agent run &",
+        # Tuples of (command, timeout_seconds, log_label)
+        steps = [
+            (
+                "pip install"
+                " 'git+https://${GH_TOKEN}@github.com/netanel-systems/social-agent.git"
+                "#egg=social-agent[agent]'",
+                120,
+                "pip install social-agent",
+            ),
+            (
+                "git clone \"${BRAIN_REPO_URL_AUTH}\" /home/user/brain",
+                60,
+                "git clone brain repo",
+            ),
+            (
+                "cd /home/user/brain &&"
+                " nohup python -m social_agent run"
+                " > /home/user/brain/agent.log 2>&1 &",
+                10,
+                "start agent process",
+            ),
         ]
 
-        for cmd in commands:
+        for cmd, timeout, label in steps:
             try:
-                self.controller.write_file(
+                self.controller.run_command(
                     sandbox_id,
-                    "/tmp/deploy_cmd.sh",
-                    f"#!/bin/bash\n{cmd}\n",
+                    cmd,
+                    timeout=timeout,
+                    envs=deploy_envs,
                 )
-                # Use a generic approach — write commands and let them run
-                # In practice, this would use sandbox.commands.run
-                logger.info("Deploy step: %s", cmd.split()[0] if cmd else "empty")
+                logger.info("Deploy step OK: %s on %s", label, sandbox_id)
             except Exception:
-                logger.exception("Deploy failed at: %s", cmd[:50])
+                logger.exception("Deploy failed at [%s] on %s", label, sandbox_id)
                 return False
 
-        logger.info("Deployment initiated on sandbox %s", sandbox_id)
+        logger.info("Deployment complete on sandbox %s", sandbox_id)
         return True
 
     def verify_successor(
@@ -265,6 +293,7 @@ class LifecycleManager:
         current_sandbox_id: str,
         repo_url: str,
         github_token: str,
+        envs: dict[str, str] | None = None,
     ) -> MigrationResult:
         """Execute a full migration: create → deploy → verify → shutdown.
 
@@ -302,7 +331,7 @@ class LifecycleManager:
             )
 
         # Step 2: Deploy
-        deployed = self.deploy_self(new_id, repo_url, github_token)
+        deployed = self.deploy_self(new_id, repo_url, github_token, envs=envs)
         if not deployed:
             # Clean up failed successor
             self.controller.kill(new_id)

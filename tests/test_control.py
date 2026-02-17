@@ -637,3 +637,106 @@ class TestApiKeyHandling:
         """API params empty when no key provided."""
         params = controller_no_key._api_params()
         assert params == {}
+
+
+# --- run_command tests ---
+
+
+class TestRunCommand:
+    """Tests for run_command() — executes shell commands inside a sandbox."""
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_success_returns_stdout(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """Returns stdout string on exit_code 0."""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.stdout = "hello from sandbox\n"
+        mock_result.stderr = ""
+        mock_sbx = MagicMock()
+        mock_sbx.commands.run.return_value = mock_result
+        mock_connect.return_value = mock_sbx
+
+        out = controller.run_command("sbx_123", "echo hello")
+        assert out == "hello from sandbox\n"
+        mock_sbx.commands.run.assert_called_once_with("echo hello", timeout=60, envs={})
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_failure_raises_runtime_error(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """Raises RuntimeError when exit_code is non-zero."""
+        mock_result = MagicMock()
+        mock_result.exit_code = 1
+        mock_result.stderr = "command not found"
+        mock_sbx = MagicMock()
+        mock_sbx.commands.run.return_value = mock_result
+        mock_connect.return_value = mock_sbx
+
+        with pytest.raises(RuntimeError, match="exit 1"):
+            controller.run_command("sbx_123", "bad_cmd")
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_envs_passed_to_sdk(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """envs dict is forwarded to commands.run()."""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.stdout = ""
+        mock_sbx = MagicMock()
+        mock_sbx.commands.run.return_value = mock_result
+        mock_connect.return_value = mock_sbx
+
+        controller.run_command(
+            "sbx_123", "printenv FOO", envs={"FOO": "bar", "KEY": "val"}
+        )
+        mock_sbx.commands.run.assert_called_once_with(
+            "printenv FOO", timeout=60, envs={"FOO": "bar", "KEY": "val"}
+        )
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_none_envs_defaults_to_empty_dict(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """envs=None is treated as empty dict."""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.stdout = ""
+        mock_sbx = MagicMock()
+        mock_sbx.commands.run.return_value = mock_result
+        mock_connect.return_value = mock_sbx
+
+        controller.run_command("sbx_123", "ls", envs=None)
+        mock_sbx.commands.run.assert_called_once_with("ls", timeout=60, envs={})
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_custom_timeout_passed_to_sdk(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """Custom timeout is forwarded to commands.run()."""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.stdout = ""
+        mock_sbx = MagicMock()
+        mock_sbx.commands.run.return_value = mock_result
+        mock_connect.return_value = mock_sbx
+
+        controller.run_command("sbx_123", "sleep 5", timeout=120)
+        mock_sbx.commands.run.assert_called_once_with("sleep 5", timeout=120, envs={})
+
+    @patch("social_agent.control.Sandbox.connect")
+    def test_uses_api_key(
+        self, mock_connect: MagicMock, controller: SandboxController
+    ) -> None:
+        """Connects to sandbox with the configured API key."""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.stdout = ""
+        mock_sbx = MagicMock()
+        mock_sbx.commands.run.return_value = mock_result
+        mock_connect.return_value = mock_sbx
+
+        controller.run_command("sbx_123", "pwd")
+        mock_connect.assert_called_once_with("sbx_123", api_key="test-key")

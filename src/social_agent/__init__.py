@@ -1,7 +1,6 @@
 """social-agent: Autonomous self-learning agent on Moltbook, powered by netanel-core."""
 
 from .agent import Action, ActivityRecord, Agent, AgentState, CycleResult
-from .brain import AgentBrain
 from .config import Settings, get_settings
 from .control import HealthCheck, HealthStatus, ProcessInfo, SandboxController, SandboxInfo
 from .cost import CostEntry, CostTracker
@@ -34,7 +33,6 @@ __all__ = [
     "ActionStats",
     "ActivityRecord",
     "Agent",
-    "AgentBrain",
     "AgentState",
     "BashResult",
     "CostEntry",
