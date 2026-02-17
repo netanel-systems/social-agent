@@ -49,6 +49,7 @@ def mock_settings() -> MagicMock:
     settings.cycle_interval_seconds = 300
     settings.quality_threshold = 0.7
     settings.circuit_breaker_threshold = 5
+    settings.research_miss_threshold = 2
     return settings
 
 

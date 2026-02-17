@@ -376,7 +376,7 @@ class Agent:
         if not self._recent_feed:
             parts.append("NOTE: No feed loaded yet. Consider READ_FEED first.")
         if not self._research_context:
-            if self._research_miss_count >= 2:
+            if self._research_miss_count >= self._settings.research_miss_threshold:
                 parts.append(
                     "NOTE: Recent RESEARCH attempts returned no results. "
                     "Skip RESEARCH and choose CREATE_POST or REPLY using your existing knowledge."
