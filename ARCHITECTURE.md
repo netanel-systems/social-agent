@@ -507,6 +507,31 @@ the dashboard frontend currently uses polling via REST endpoints.
 **Revenue model:** Shareable public URL. Anyone can watch Nathan learn.
 Admin features behind auth. The dashboard is our first revenue product.
 
+#### 7.4.1 Dashboard Deployment (Railway)
+
+The dashboard runs as a Docker container on Railway using a **hybrid two-phase architecture**:
+
+**DISCOVERY (startup — reads local nathan-brain clone):**
+1. Dockerfile CMD: `git clone nathan-brain /app/nathan-brain` → then start server
+2. `get_active_sandbox_id(brain_repo_path)` reads `nathan-brain/state.json`
+3. Returns `current_sandbox_id` — the active E2B sandbox
+4. `DashboardServer` starts with the discovered sandbox_id
+
+**MONITORING (runtime — reads E2B sandbox files directly):**
+- Every `/api/status`, `/api/activity`, `/api/heartbeat` request reads live files from the E2B sandbox via `SandboxController`
+- NOT from nathan-brain — from the live sandbox (always current)
+
+**Periodic re-discovery (120s background loop):**
+- `DashboardServer._discovery_worker()` re-reads `nathan-brain/state.json` every 120s
+- If `current_sandbox_id` changes (agent self-migrated), dashboard automatically follows
+- Old sandbox goes dead → new sandbox_id appears in state.json → dashboard switches within 120s
+- Worker only runs when `brain_repo_path` is set (auto-discovery mode)
+
+**Root cause fixed (Issue #61):**
+- `railway.json` `startCommand` was overriding Dockerfile CMD, skipping the git clone step
+- `/app/nathan-brain` never existed → `get_active_sandbox_id` always returned `sbx-not-started`
+- Fix: remove `startCommand` from `railway.json` — trust Dockerfile CMD entirely
+
 #### 7.5 Dashboard Frontend
 
 Pure HTML + vanilla JS + CSS. No build tools, no React, no npm.

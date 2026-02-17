@@ -26,6 +26,7 @@ from urllib.parse import parse_qs, urlparse
 
 from social_agent.control import SandboxController
 from social_agent.dashboard import build_dashboard, compute_action_stats, load_activity_log
+from social_agent.discovery import get_active_sandbox_id
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -42,6 +43,11 @@ _MAX_ACTIVITY_LIMIT = 200
 _DEFAULT_ACTIVITY_LIMIT = 50
 # Max request body size (64KB — ample for rule injection).
 _MAX_BODY_SIZE = 65536
+# Discovery worker interval, placeholder value, and safety cap.
+_DISCOVERY_INTERVAL_S = 120
+_DISCOVERY_PLACEHOLDER = "sbx-not-started"
+# 10,000 x 120s = ~13 days. Prevents infinite loop if stop event fails.
+_MAX_DISCOVERY_ITERATIONS = 10_000
 
 
 class _RequestHandler(BaseHTTPRequestHandler):
@@ -66,6 +72,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         """Handle GET requests — API routes, static files, and index."""
+        # Snapshot sandbox_id at request entry so one request always sees
+        # a consistent ID, even if the discovery worker updates it mid-flight.
+        self.sandbox_id = type(self).sandbox_id
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
@@ -98,6 +107,8 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         """Handle POST requests (admin actions)."""
+        # Snapshot sandbox_id at request entry for consistent reads.
+        self.sandbox_id = type(self).sandbox_id
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
 
@@ -406,6 +417,9 @@ class DashboardServer:
         state_path: Path to local state.json.
         activity_log_path: Path to local activity.jsonl.
         heartbeat_path: Path to local heartbeat.json.
+        brain_repo_path: Path to nathan-brain repo for periodic sandbox
+            discovery. When set, a background worker re-reads state.json
+            every 120s and updates sandbox_id if the agent migrated.
         dashboard_token: Admin token for kill/inject actions.
         port: Port to serve on (default: 8080).
         host: Host to bind to (default: 0.0.0.0).
@@ -420,6 +434,7 @@ class DashboardServer:
         state_path: Path | None = None,
         activity_log_path: Path | None = None,
         heartbeat_path: Path | None = None,
+        brain_repo_path: Path | None = None,
         dashboard_token: str = "",
         port: int = 8080,
         host: str = "0.0.0.0",  # noqa: S104
@@ -432,11 +447,16 @@ class DashboardServer:
         self._state_path = state_path or _Path("state.json")
         self._activity_log_path = activity_log_path or _Path("logs/activity.jsonl")
         self._heartbeat_path = heartbeat_path or _Path("heartbeat.json")
+        self._brain_repo_path = brain_repo_path
         self._dashboard_token = dashboard_token
         self._port = port
         self._host = host
         self._server: HTTPServer | None = None
         self._thread: threading.Thread | None = None
+        self._handler_class: type[_RequestHandler] | None = None
+        self._discovery_running: bool = False
+        self._discovery_thread: threading.Thread | None = None
+        self._discovery_stop = threading.Event()
 
     @property
     def is_running(self) -> bool:
@@ -482,8 +502,8 @@ class DashboardServer:
         if self._server is not None:
             return
 
-        handler_class = self._make_handler()
-        self._server = HTTPServer((self._host, self._port), handler_class)
+        self._handler_class = self._make_handler()
+        self._server = HTTPServer((self._host, self._port), self._handler_class)
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             daemon=True,
@@ -493,9 +513,17 @@ class DashboardServer:
         logger.info(
             "Dashboard server started on %s:%d", self._host, self._port
         )
+        self._start_discovery_worker()
 
     def stop(self) -> None:
         """Stop the server gracefully."""
+        if self._discovery_running:
+            self._discovery_running = False
+            self._discovery_stop.set()
+            if self._discovery_thread is not None:
+                self._discovery_thread.join(timeout=5)
+                self._discovery_thread = None
+
         if self._server is None:
             return
 
@@ -506,6 +534,70 @@ class DashboardServer:
         self._server = None
         self._thread = None
         logger.info("Dashboard server stopped")
+
+    def _start_discovery_worker(self) -> None:
+        """Start background discovery worker if brain_repo_path is set."""
+        if self._brain_repo_path is None or self._discovery_running:
+            return
+
+        self._discovery_stop.clear()
+        self._discovery_running = True
+        self._discovery_thread = threading.Thread(
+            target=self._discovery_worker,
+            daemon=True,
+            name="discovery-worker",
+        )
+        self._discovery_thread.start()
+        logger.info(
+            "Discovery worker started (brain_repo=%s, interval=%ds)",
+            self._brain_repo_path, _DISCOVERY_INTERVAL_S,
+        )
+
+    def _discovery_worker(self) -> None:
+        """Periodically refresh sandbox_id from nathan-brain/state.json.
+
+        Runs every _DISCOVERY_INTERVAL_S seconds. When the active sandbox
+        changes (agent migrated), updates self._sandbox_id and the handler
+        class so subsequent requests use the new sandbox.
+
+        Bounded by _MAX_DISCOVERY_ITERATIONS (JPL Rule 1 — no unbounded loops).
+        At 120s per iteration this is ~13 days; the watchdog redeploys long
+        before this limit is reached in practice.
+        """
+        iterations = 0
+        while self._discovery_running:
+            iterations += 1
+            if iterations > _MAX_DISCOVERY_ITERATIONS:
+                logger.warning(
+                    "Discovery worker reached max iterations (%d), stopping",
+                    _MAX_DISCOVERY_ITERATIONS,
+                )
+                break
+
+            if self._discovery_stop.wait(_DISCOVERY_INTERVAL_S):
+                break
+
+            if self._brain_repo_path is None:
+                continue
+
+            try:
+                new_id = get_active_sandbox_id(self._brain_repo_path)
+            except Exception:
+                logger.exception("Discovery worker failed to read sandbox ID")
+                continue
+
+            if (
+                new_id
+                and new_id != _DISCOVERY_PLACEHOLDER
+                and new_id != self._sandbox_id
+            ):
+                logger.info(
+                    "Discovery: sandbox updated %s → %s",
+                    self._sandbox_id, new_id,
+                )
+                self._sandbox_id = new_id
+                if self._handler_class is not None:
+                    self._handler_class.sandbox_id = new_id
 
     def wait(self, timeout: float | None = None) -> None:
         """Block until the server stops.

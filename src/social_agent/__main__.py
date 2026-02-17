@@ -239,6 +239,7 @@ def cmd_serve(args: argparse.Namespace) -> None:
     )
 
     # Auto-discover sandbox_id from nathan-brain if not provided
+    brain_path: Path | None = None
     sandbox_id = args.sandbox_id
     if sandbox_id is None:
         brain_path = Path(args.brain_repo).expanduser()
@@ -261,6 +262,7 @@ def cmd_serve(args: argparse.Namespace) -> None:
         sandbox_id=sandbox_id,
         controller=SandboxController(),
         cost_tracker=cost_tracker,
+        brain_repo_path=brain_path,
         state_path=Path("state.json"),
         activity_log_path=Path("logs/activity.jsonl"),
         heartbeat_path=Path("heartbeat.json"),
@@ -277,7 +279,7 @@ def cmd_serve(args: argparse.Namespace) -> None:
 
     server.start()
     print(f"Dashboard API serving on http://0.0.0.0:{args.port}")
-    print(f"Monitoring sandbox: {args.sandbox_id}")
+    print(f"Monitoring sandbox: {sandbox_id}")
     print("Press Ctrl+C to stop.")
 
     # Block until server stops
