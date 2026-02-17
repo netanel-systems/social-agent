@@ -350,6 +350,7 @@ class Agent:
             f"Posts today: {self._state.posts_today}/{self._settings.max_posts_per_day}",
             f"Replies today: {self._state.replies_today}/{self._settings.max_replies_per_day}",
             f"Upvotes today: {self._state.upvotes_today}/{self._settings.max_upvotes_per_day}",
+            f"Downvotes today: {self._state.downvotes_today}/{self._settings.max_downvotes_per_day}",
             f"Follows today: {self._state.follows_today}/{self._settings.max_follows_per_day}",
             f"Subscribes today: {self._state.subscribes_today}/{self._settings.max_subscribes_per_day}",
             f"Feed posts loaded: {len(self._recent_feed)}",
@@ -361,6 +362,8 @@ class Agent:
             parts.append("CONSTRAINT: Daily reply limit reached. Cannot REPLY.")
         if self._state.upvotes_today >= self._settings.max_upvotes_per_day:
             parts.append("CONSTRAINT: Daily upvote limit reached. Cannot UPVOTE.")
+        if self._state.downvotes_today >= self._settings.max_downvotes_per_day:
+            parts.append("CONSTRAINT: Daily downvote limit reached. Cannot DOWNVOTE.")
         if self._state.follows_today >= self._settings.max_follows_per_day:
             parts.append("CONSTRAINT: Daily follow limit reached. Cannot FOLLOW.")
         if self._state.subscribes_today >= self._settings.max_subscribes_per_day:
@@ -758,6 +761,7 @@ class Agent:
         self._state.downvotes_today += 1
         details = f"Downvoted: {post.title[:50]}"
         self._log_activity("DOWNVOTE", success=True, details=details)
+        self._notify(details, "info")
         return CycleResult(action="DOWNVOTE", success=True, details=details)
 
     def _act_follow(self) -> CycleResult:

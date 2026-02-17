@@ -1247,9 +1247,9 @@ def test_upvote_api_failure(
 
 
 def test_downvote_success(
-    agent: Agent, mock_moltbook: MagicMock
+    agent: Agent, mock_moltbook: MagicMock, mock_notifier: MagicMock
 ) -> None:
-    """DOWNVOTE succeeds and increments downvotes_today."""
+    """DOWNVOTE succeeds, increments downvotes_today, and sends notification."""
     agent._recent_feed = _feed_posts(2)
     mock_moltbook.downvote_post.return_value = PostResult(post_id="post-1", success=True)
 
@@ -1258,6 +1258,7 @@ def test_downvote_success(
     assert result.success is True
     assert agent._state.downvotes_today == 1
     assert len(agent.recent_feed) == 1  # Feed rotated
+    mock_notifier.notify.assert_called()  # Telegram notification sent
 
 
 def test_downvote_daily_limit(
@@ -1354,14 +1355,16 @@ def test_subscribe_daily_limit(
 
 
 def test_decision_context_includes_new_counters(agent: Agent) -> None:
-    """Decision context includes upvote, follow, subscribe counters."""
+    """Decision context includes all engagement counters including downvotes."""
     agent._state.upvotes_today = 5
+    agent._state.downvotes_today = 2
     agent._state.follows_today = 3
     agent._state.subscribes_today = 1
 
     context = agent._build_decision_context()
 
     assert "Upvotes today: 5/50" in context
+    assert "Downvotes today: 2/10" in context
     assert "Follows today: 3/20" in context
     assert "Subscribes today: 1/5" in context
 
@@ -1372,6 +1375,14 @@ def test_decision_context_upvote_limit(agent: Agent) -> None:
     context = agent._build_decision_context()
     assert "CONSTRAINT" in context
     assert "UPVOTE" in context
+
+
+def test_decision_context_downvote_limit(agent: Agent) -> None:
+    """Decision context flags when downvote limit reached."""
+    agent._state.downvotes_today = 10  # default max
+    context = agent._build_decision_context()
+    assert "CONSTRAINT" in context
+    assert "DOWNVOTE" in context
 
 
 def test_decision_context_follow_limit(agent: Agent) -> None:
