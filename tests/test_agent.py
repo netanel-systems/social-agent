@@ -1407,3 +1407,41 @@ def test_daily_reset_clears_new_counters(agent: Agent) -> None:
     assert agent._state.downvotes_today == 0
     assert agent._state.follows_today == 0
     assert agent._state.subscribes_today == 0
+
+
+# --- Git push path fix (Issue #53) ---
+
+
+@patch("social_agent.git_push.push_state")
+def test_git_push_uses_state_path_parent(
+    mock_push: MagicMock,
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """push_state is called with state_path.resolve().parent, not ~/nathan-brain.
+
+    Fix (Issue #53): brain is cloned to /home/user/brain by watchdog,
+    but agent was looking at ~/nathan-brain — path mismatch, git push
+    never fired.
+    """
+    mock_settings.git_sync_enabled = True
+    mock_settings.brain_repo_url = "https://github.com/netanel-systems/nathan-brain.git"
+
+    state_path = tmp_dir / "state.json"
+    Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=state_path,
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+        sandbox_id="sbx_new_123",
+    )
+
+    mock_push.assert_called_once_with(
+        state_path.resolve().parent,
+        "agent startup: sandbox_id=sbx_new_123",
+    )
