@@ -485,6 +485,7 @@ class Agent:
             self._research_miss_count += 1
             details = f"Research returned no results — skipped (query: {query})"
             self._log_activity("RESEARCH", success=True, details=details)
+            self._notify(details, "info")
             return CycleResult(action="RESEARCH", success=True, details=details)
 
         # Branch 3: Success with results — reset miss counter, store context
