@@ -234,7 +234,7 @@ class TestListSandboxes:
             return items
 
         # Property-based has_next: True until all pages consumed
-        type(mock_paginator).has_next = property(lambda self: page_idx[0] < len(pages))
+        type(mock_paginator).has_next = property(lambda _: page_idx[0] < len(pages))
         mock_paginator.next_items = _next_pages
         mock_list.return_value = mock_paginator
 
