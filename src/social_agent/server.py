@@ -43,9 +43,11 @@ _MAX_ACTIVITY_LIMIT = 200
 _DEFAULT_ACTIVITY_LIMIT = 50
 # Max request body size (64KB — ample for rule injection).
 _MAX_BODY_SIZE = 65536
-# Discovery worker interval and placeholder value.
+# Discovery worker interval, placeholder value, and safety cap.
 _DISCOVERY_INTERVAL_S = 120
 _DISCOVERY_PLACEHOLDER = "sbx-not-started"
+# 10,000 × 120s ≈ 13 days. Prevents infinite loop if stop event fails.
+_MAX_DISCOVERY_ITERATIONS = 10_000
 
 
 class _RequestHandler(BaseHTTPRequestHandler):
@@ -557,8 +559,21 @@ class DashboardServer:
         Runs every _DISCOVERY_INTERVAL_S seconds. When the active sandbox
         changes (agent migrated), updates self._sandbox_id and the handler
         class so subsequent requests use the new sandbox.
+
+        Bounded by _MAX_DISCOVERY_ITERATIONS (JPL Rule 1 — no unbounded loops).
+        At 120s per iteration this is ~13 days; the watchdog redeployes long
+        before this limit is reached in practice.
         """
+        iterations = 0
         while self._discovery_running:
+            iterations += 1
+            if iterations > _MAX_DISCOVERY_ITERATIONS:
+                logger.warning(
+                    "Discovery worker reached max iterations (%d), stopping",
+                    _MAX_DISCOVERY_ITERATIONS,
+                )
+                break
+
             if self._discovery_stop.wait(_DISCOVERY_INTERVAL_S):
                 break
 
