@@ -86,7 +86,15 @@ class TestKillAll:
         sbx2.template_id = "tmpl_2"
         sbx2.started_at = "2026-01-01T00:00:00Z"
         sbx2.metadata = {}
-        mock_list.return_value = [sbx1, sbx2]
+        mock_paginator = MagicMock()
+        mock_paginator.has_next = True
+
+        def _next_multiple() -> list[MagicMock]:
+            mock_paginator.has_next = False
+            return [sbx1, sbx2]
+
+        mock_paginator.next_items = _next_multiple
+        mock_list.return_value = mock_paginator
         mock_kill.return_value = True
 
         killed = controller.kill_all()
@@ -99,7 +107,9 @@ class TestKillAll:
         self, mock_list: MagicMock, mock_kill: MagicMock, controller: SandboxController
     ) -> None:
         """Kill all with no sandboxes returns empty list."""
-        mock_list.return_value = []
+        mock_paginator = MagicMock()
+        mock_paginator.has_next = False
+        mock_list.return_value = mock_paginator
         killed = controller.kill_all()
         assert killed == []
         mock_kill.assert_not_called()
@@ -120,7 +130,15 @@ class TestKillAll:
         sbx2.template_id = None
         sbx2.started_at = None
         sbx2.metadata = {}
-        mock_list.return_value = [sbx1, sbx2]
+        mock_paginator = MagicMock()
+        mock_paginator.has_next = True
+
+        def _next_partial() -> list[MagicMock]:
+            mock_paginator.has_next = False
+            return [sbx1, sbx2]
+
+        mock_paginator.next_items = _next_partial
+        mock_list.return_value = mock_paginator
         mock_kill.side_effect = [True, False]
 
         killed = controller.kill_all()
@@ -167,7 +185,15 @@ class TestListSandboxes:
         sbx1.template_id = "tmpl"
         sbx1.started_at = "2026-01-01"
         sbx1.metadata = {"env": "prod"}
-        mock_list.return_value = [sbx1]
+        mock_paginator = MagicMock()
+        mock_paginator.has_next = True
+
+        def _next_list() -> list[MagicMock]:
+            mock_paginator.has_next = False
+            return [sbx1]
+
+        mock_paginator.next_items = _next_list
+        mock_list.return_value = mock_paginator
 
         result = controller.list_sandboxes()
         assert len(result) == 1
@@ -179,8 +205,44 @@ class TestListSandboxes:
     @patch("social_agent.control.Sandbox.list")
     def test_list_empty(self, mock_list: MagicMock, controller: SandboxController) -> None:
         """Returns empty list when no sandboxes."""
-        mock_list.return_value = []
+        mock_paginator = MagicMock()
+        mock_paginator.has_next = False
+        mock_list.return_value = mock_paginator
         assert controller.list_sandboxes() == []
+
+    @patch("social_agent.control.Sandbox.list")
+    def test_list_multiple_pages(self, mock_list: MagicMock, controller: SandboxController) -> None:
+        """Accumulates sandboxes across multiple paginator pages."""
+        sbx1 = MagicMock()
+        sbx1.sandbox_id = "sbx_1"
+        sbx1.template_id = "tmpl"
+        sbx1.started_at = "2026-01-01"
+        sbx1.metadata = {}
+        sbx2 = MagicMock()
+        sbx2.sandbox_id = "sbx_2"
+        sbx2.template_id = "tmpl"
+        sbx2.started_at = "2026-01-02"
+        sbx2.metadata = {}
+
+        mock_paginator = MagicMock()
+        pages = [[sbx1], [sbx2]]
+        page_idx = [0]
+
+        def _next_pages() -> list[MagicMock]:
+            items = pages[page_idx[0]]
+            page_idx[0] += 1
+            if page_idx[0] >= len(pages):
+                mock_paginator.has_next = False
+            return items
+
+        mock_paginator.has_next = True
+        mock_paginator.next_items = _next_pages
+        mock_list.return_value = mock_paginator
+
+        result = controller.list_sandboxes()
+        assert len(result) == 2
+        assert result[0].sandbox_id == "sbx_1"
+        assert result[1].sandbox_id == "sbx_2"
 
 
 # --- File I/O tests ---
