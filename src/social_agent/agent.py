@@ -478,6 +478,7 @@ class Agent:
         if not search_ok:
             details = f"Search failed: {search_error}"
             self._log_activity("RESEARCH", success=False, details=details)
+            self._notify(details, "warning")
             return CycleResult(action="RESEARCH", success=False, details=details)
 
         # Branch 2: Sandbox ran fine, DDGS found nothing — soft-skip
