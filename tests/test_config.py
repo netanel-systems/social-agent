@@ -229,3 +229,44 @@ def test_langsmith_defaults(required_env: dict[str, object]) -> None:
     assert settings.langsmith_tracing is False
     assert settings.langsmith_project == "social-agent"
     assert settings.langsmith_api_key is None
+
+
+# --- Issue #49: new daily limits ---
+
+
+def test_new_engagement_limit_defaults(required_env: dict[str, object]) -> None:
+    """New engagement limits have correct defaults."""
+    settings = Settings(**required_env)  # type: ignore[arg-type]
+    assert settings.max_upvotes_per_day == 50
+    assert settings.max_downvotes_per_day == 10
+    assert settings.max_follows_per_day == 20
+    assert settings.max_subscribes_per_day == 5
+
+
+def test_new_engagement_limits_reject_zero(required_env: dict[str, object]) -> None:
+    """Zero values are rejected for all new engagement limits."""
+    from pydantic import ValidationError
+
+    for field in (
+        "max_upvotes_per_day",
+        "max_downvotes_per_day",
+        "max_follows_per_day",
+        "max_subscribes_per_day",
+    ):
+        with pytest.raises(ValidationError):
+            Settings(**required_env, **{field: 0})  # type: ignore[arg-type]
+
+
+def test_new_engagement_limits_accept_custom(required_env: dict[str, object]) -> None:
+    """Custom positive values are accepted for engagement limits."""
+    settings = Settings(
+        **required_env,  # type: ignore[arg-type]
+        max_upvotes_per_day=100,
+        max_downvotes_per_day=5,
+        max_follows_per_day=30,
+        max_subscribes_per_day=10,
+    )
+    assert settings.max_upvotes_per_day == 100
+    assert settings.max_downvotes_per_day == 5
+    assert settings.max_follows_per_day == 30
+    assert settings.max_subscribes_per_day == 10

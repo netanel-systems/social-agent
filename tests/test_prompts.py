@@ -63,3 +63,21 @@ def test_decide_prompt_includes_create_post_directive() -> None:
     assert "CREATE_POST" in decide
     # Directive exists instructing at least one post per day
     assert "original" in decide.lower()
+
+
+# --- Issue #49: new actions in decide prompt ---
+
+
+def test_decide_prompt_includes_all_nine_actions() -> None:
+    """moltbook-decide prompt lists all 9 actions including new engagement ones."""
+    decide = PROMPTS["moltbook-decide"]
+    for action in ("READ_FEED", "RESEARCH", "REPLY", "CREATE_POST", "ANALYZE",
+                   "UPVOTE", "DOWNVOTE", "FOLLOW", "SUBSCRIBE"):
+        assert action in decide, f"Missing action in decide prompt: {action}"
+
+
+def test_decide_prompt_output_format_includes_new_actions() -> None:
+    """Output format line in decide prompt references all 9 action names."""
+    decide = PROMPTS["moltbook-decide"]
+    for action in ("UPVOTE", "DOWNVOTE", "FOLLOW", "SUBSCRIBE"):
+        assert action in decide

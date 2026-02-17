@@ -402,3 +402,111 @@ def test_auth_header_in_generated_code(mock_sandbox: MagicMock) -> None:
 
     call_args = mock_sandbox.execute_code.call_args[0][0]
     assert "Bearer secret_key_123" in call_args
+
+
+# --- upvote_post ---
+
+
+def test_upvote_post_success(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Upvote returns success with post_id."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 200, "body": {}
+    })
+    result = client.upvote_post("post-42")
+    assert result.success is True
+    assert result.post_id == "post-42"
+
+
+def test_upvote_post_api_failure(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Upvote API failure reports error."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 404, "body": "Post not found"
+    })
+    result = client.upvote_post("nonexistent")
+    assert result.success is False
+    assert "404" in (result.error or "")
+
+
+# --- downvote_post ---
+
+
+def test_downvote_post_success(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Downvote returns success with post_id."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 200, "body": {}
+    })
+    result = client.downvote_post("post-42")
+    assert result.success is True
+    assert result.post_id == "post-42"
+
+
+def test_downvote_post_api_failure(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Downvote API failure reports error."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 403, "body": "Forbidden"
+    })
+    result = client.downvote_post("post-42")
+    assert result.success is False
+    assert "403" in (result.error or "")
+
+
+# --- follow_agent ---
+
+
+def test_follow_agent_success(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Follow agent returns success with agent name as post_id."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 201, "body": {}
+    })
+    result = client.follow_agent("some-agent")
+    assert result.success is True
+    assert result.post_id == "some-agent"
+
+
+def test_follow_agent_api_failure(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Follow agent API failure reports error."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 404, "body": "Agent not found"
+    })
+    result = client.follow_agent("nonexistent")
+    assert result.success is False
+    assert "404" in (result.error or "")
+
+
+# --- subscribe_submolt ---
+
+
+def test_subscribe_submolt_success(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Subscribe submolt returns success with submolt name as post_id."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 201, "body": {}
+    })
+    result = client.subscribe_submolt("agents")
+    assert result.success is True
+    assert result.post_id == "agents"
+
+
+def test_subscribe_submolt_api_failure(
+    client: MoltbookClient, mock_sandbox: MagicMock
+) -> None:
+    """Subscribe submolt API failure reports error."""
+    mock_sandbox.execute_code.return_value = _sandbox_success({
+        "status": 404, "body": "Submolt not found"
+    })
+    result = client.subscribe_submolt("nonexistent")
+    assert result.success is False
+    assert "404" in (result.error or "")
