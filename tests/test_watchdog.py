@@ -488,7 +488,7 @@ class TestWatchdogConfigEnvs:
         cfg = WatchdogConfig(
             e2b_api_key="k",
             brain_repo_url="https://example.com/brain",
-            github_token="ghp_tok",
+            github_token="ghp_tok",  # noqa: S106
             envs={"OPENAI_API_KEY": "sk-test"},
         )
         _handle_no_sandboxes(mock_lifecycle, cfg)

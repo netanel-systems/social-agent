@@ -19,7 +19,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import shlex
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -181,7 +180,7 @@ class LifecycleManager:
                 "https://", f"https://{github_token}@", 1
             )
         else:
-            deploy_envs["BRAIN_REPO_URL_AUTH"] = shlex.quote(repo_url)
+            deploy_envs["BRAIN_REPO_URL_AUTH"] = repo_url
 
         # Tuples of (command, timeout_seconds, log_label)
         steps = [

@@ -256,7 +256,7 @@ class TestDeploySelf:
         for call in mock_controller.run_command.call_args_list:
             envs = call.kwargs.get("envs", {})
             assert "GH_TOKEN" in envs
-            assert envs["GH_TOKEN"] == "ghp_token123"
+            assert envs["GH_TOKEN"] == "ghp_token123"  # noqa: S105
 
     def test_deploy_extra_envs_passed_through(
         self,

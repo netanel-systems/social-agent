@@ -62,7 +62,7 @@ class WatchdogConfig:
     github_token: str
     stuck_threshold_s: float = _STUCK_THRESHOLD_S
     # All secrets to inject when deploying a new sandbox
-    envs: dict = field(default_factory=dict)
+    envs: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> WatchdogConfig:

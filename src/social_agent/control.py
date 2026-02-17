@@ -365,9 +365,7 @@ class SandboxController:
         sbx = Sandbox.connect(sandbox_id, **self._api_params())
         result = sbx.commands.run(command, timeout=timeout, envs=envs or {})
         if result.exit_code != 0:
-            raise RuntimeError(
-                f"Command failed (exit {result.exit_code}): {result.stderr}"
-            )
+            raise RuntimeError(f"exit {result.exit_code}: {result.stderr}")
         logger.info(
             "run_command: [%s] exit=0 in %s",
             command[:50].replace("\n", " "),
