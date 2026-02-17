@@ -177,6 +177,7 @@ class Agent:
         self._heartbeat_path = heartbeat_path or _Path("heartbeat.json")
         self._sandbox_id = sandbox_id
         self._state = AgentState.load(self._state_path)
+        self._state.consecutive_failures = 0  # Fresh start — stale failures from a dead sandbox must not carry over
         self._shutdown_requested = False
         self._recent_feed: list[MoltbookPost] = []
         self._research_context: str = ""

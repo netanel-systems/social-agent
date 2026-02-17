@@ -211,6 +211,45 @@ def test_state_from_json_ignores_unknown_keys() -> None:
     assert state.cycle_count == 5
 
 
+# --- Agent init ---
+
+
+def test_agent_init_resets_consecutive_failures(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Agent init resets consecutive_failures to 0 from saved state.
+
+    A new sandbox must not inherit failure debt from a dead predecessor.
+    Persistent fields (cycle_count, posts_today, replies_today) are preserved.
+    """
+    # Simulate state.json left by a previous dead run
+    stale_state = AgentState(
+        consecutive_failures=5, cycle_count=10, posts_today=2, replies_today=7
+    )
+    stale_state.save(tmp_dir / "state.json")
+
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+        heartbeat_path=tmp_dir / "heartbeat.json",
+    )
+
+    # Failure count reset — no circuit breaker on fresh start
+    assert agent.state.consecutive_failures == 0
+    # Persistent fields preserved
+    assert agent.state.cycle_count == 10
+    assert agent.state.posts_today == 2
+    assert agent.state.replies_today == 7
+
+
 # --- should_continue ---
 
 
