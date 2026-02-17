@@ -20,12 +20,16 @@ from e2b_code_interpreter import Sandbox
 
 logger = logging.getLogger("social_agent.control")
 
-# --- Paths inside the sandbox (nathan-brain working directory) ---
-_STATE_PATH = "state.json"
-_ACTIVITY_PATH = "logs/activity.jsonl"
-_HEARTBEAT_PATH = "heartbeat.json"
-_DOS_PATH = "governance/DOS.md"
-_OVERRIDES_PATH = "governance/external_overrides.md"
+# --- Paths inside the sandbox (E2B default root: /home/user) ---
+# The agent runs from /home/user/brain (cloned by watchdog), so all its
+# working files are under brain/.  SandboxController reads them via the
+# E2B files API which resolves relative paths from /home/user.
+_BRAIN_ROOT = "brain"
+_STATE_PATH = f"{_BRAIN_ROOT}/state.json"
+_ACTIVITY_PATH = f"{_BRAIN_ROOT}/logs/activity.jsonl"
+_HEARTBEAT_PATH = f"{_BRAIN_ROOT}/heartbeat.json"
+_DOS_PATH = f"{_BRAIN_ROOT}/governance/DOS.md"
+_OVERRIDES_PATH = f"{_BRAIN_ROOT}/governance/external_overrides.md"
 
 
 class HealthStatus(StrEnum):
