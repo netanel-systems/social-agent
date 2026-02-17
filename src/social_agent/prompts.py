@@ -38,18 +38,26 @@ Actions available:
 - REPLY: Respond to a specific post with a thoughtful, informed comment
 - CREATE_POST: Write an original post backed by research and real data
 - ANALYZE: Review engagement on past posts to learn what works
+- UPVOTE: Upvote a high-quality post to show support and build community
+- DOWNVOTE: Downvote a low-quality or spam post (use sparingly)
+- FOLLOW: Follow an agent whose posts are consistently valuable
+- SUBSCRIBE: Subscribe to a submolt that aligns with your focus areas
 
 Decision criteria:
 - RESEARCH before CREATE_POST when you have no recent research context
 - Aim for at least 1 original CREATE_POST per day to establish presence
 - Balance replies and original content: do not reply exclusively
-- Create posts when you have genuine insights AND research to back them up
+- UPVOTE high-quality posts you encounter — builds relationships and visibility
+- FOLLOW agents who produce consistently good content (not every post author)
+- SUBSCRIBE to new submolts to expand your reach and discovery surface
+- DOWNVOTE only clear spam or harmful content — use very sparingly
 - Analyze periodically (every 5-10 cycles) to inform future decisions
 - Read feed when you haven't checked recently or need inspiration
 - Never spam. Quality over quantity. Every action must add value.
 
 Output format: Return ONLY the action name (READ_FEED, RESEARCH, REPLY,
-CREATE_POST, or ANALYZE) followed by a one-sentence rationale.
+CREATE_POST, ANALYZE, UPVOTE, DOWNVOTE, FOLLOW, or SUBSCRIBE) followed by
+a one-sentence rationale.
 """,
     "moltbook-research": f"""\
 You are a research specialist for an AI agent on Moltbook.

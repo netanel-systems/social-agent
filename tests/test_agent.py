@@ -42,6 +42,10 @@ def mock_settings() -> MagicMock:
     settings.max_cycles = 500
     settings.max_posts_per_day = 5
     settings.max_replies_per_day = 20
+    settings.max_upvotes_per_day = 50
+    settings.max_downvotes_per_day = 10
+    settings.max_follows_per_day = 20
+    settings.max_subscribes_per_day = 5
     settings.cycle_interval_seconds = 300
     settings.quality_threshold = 0.7
     settings.circuit_breaker_threshold = 5
@@ -114,13 +118,17 @@ def _feed_posts(count: int = 3) -> list[MoltbookPost]:
 
 
 def test_action_values() -> None:
-    """All 5 actions exist with correct values."""
+    """All 9 actions exist with correct values (Issue #49 expanded action space)."""
     assert Action.READ_FEED == "READ_FEED"
     assert Action.RESEARCH == "RESEARCH"
     assert Action.REPLY == "REPLY"
     assert Action.CREATE_POST == "CREATE_POST"
     assert Action.ANALYZE == "ANALYZE"
-    assert len(Action) == 5
+    assert Action.UPVOTE == "UPVOTE"
+    assert Action.DOWNVOTE == "DOWNVOTE"
+    assert Action.FOLLOW == "FOLLOW"
+    assert Action.SUBSCRIBE == "SUBSCRIBE"
+    assert len(Action) == 9
 
 
 # --- AgentState ---
@@ -1178,3 +1186,213 @@ def test_decision_context_no_create_post_hint_when_post_already_made(
 
     # Hint should not fire when post already made
     assert "Strongly consider CREATE_POST" not in context
+
+
+# --- Issue #49: full action space ---
+
+
+# --- UPVOTE ---
+
+
+def test_upvote_success(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """UPVOTE succeeds and increments upvotes_today."""
+    agent._recent_feed = _feed_posts(3)
+    mock_moltbook.upvote_post.return_value = PostResult(post_id="post-1", success=True)
+
+    result = agent._act_upvote()
+
+    assert result.success is True
+    assert agent._state.upvotes_today == 1
+    assert len(agent.recent_feed) == 2  # Feed rotated
+
+
+def test_upvote_no_feed(agent: Agent) -> None:
+    """UPVOTE fails when no feed is loaded."""
+    result = agent._act_upvote()
+    assert result.success is False
+    assert "feed" in result.details.lower()
+
+
+def test_upvote_daily_limit(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """UPVOTE blocked when daily limit reached."""
+    agent._state.upvotes_today = 50  # default max
+    agent._recent_feed = _feed_posts(1)
+
+    result = agent._act_upvote()
+
+    assert result.success is False
+    mock_moltbook.upvote_post.assert_not_called()
+
+
+def test_upvote_api_failure(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """UPVOTE handles API failure without incrementing counter."""
+    agent._recent_feed = _feed_posts(1)
+    mock_moltbook.upvote_post.return_value = PostResult(
+        success=False, error="Rate limited"
+    )
+
+    result = agent._act_upvote()
+
+    assert result.success is False
+    assert agent._state.upvotes_today == 0
+
+
+# --- DOWNVOTE ---
+
+
+def test_downvote_success(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """DOWNVOTE succeeds and increments downvotes_today."""
+    agent._recent_feed = _feed_posts(2)
+    mock_moltbook.downvote_post.return_value = PostResult(post_id="post-1", success=True)
+
+    result = agent._act_downvote()
+
+    assert result.success is True
+    assert agent._state.downvotes_today == 1
+    assert len(agent.recent_feed) == 1  # Feed rotated
+
+
+def test_downvote_daily_limit(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """DOWNVOTE blocked when daily limit reached."""
+    agent._state.downvotes_today = 10  # default max
+    agent._recent_feed = _feed_posts(1)
+
+    result = agent._act_downvote()
+
+    assert result.success is False
+    mock_moltbook.downvote_post.assert_not_called()
+
+
+# --- FOLLOW ---
+
+
+def test_follow_success(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """FOLLOW succeeds and increments follows_today."""
+    posts = _feed_posts(2)
+    agent._recent_feed = posts
+    mock_moltbook.follow_agent.return_value = PostResult(
+        post_id=posts[0].author, success=True
+    )
+
+    result = agent._act_follow()
+
+    assert result.success is True
+    assert agent._state.follows_today == 1
+    assert len(agent.recent_feed) == 1  # Feed rotated
+
+
+def test_follow_no_feed(agent: Agent) -> None:
+    """FOLLOW fails when no feed is loaded."""
+    result = agent._act_follow()
+    assert result.success is False
+
+
+def test_follow_daily_limit(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """FOLLOW blocked when daily limit reached."""
+    agent._state.follows_today = 20  # default max
+    agent._recent_feed = _feed_posts(1)
+
+    result = agent._act_follow()
+
+    assert result.success is False
+    mock_moltbook.follow_agent.assert_not_called()
+
+
+# --- SUBSCRIBE ---
+
+
+def test_subscribe_success(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """SUBSCRIBE succeeds and increments subscribes_today."""
+    agent._recent_feed = _feed_posts(2)
+    mock_moltbook.subscribe_submolt.return_value = PostResult(
+        post_id="agents", success=True
+    )
+
+    result = agent._act_subscribe()
+
+    assert result.success is True
+    assert agent._state.subscribes_today == 1
+    assert len(agent.recent_feed) == 1  # Feed rotated
+
+
+def test_subscribe_no_feed(agent: Agent) -> None:
+    """SUBSCRIBE fails when no feed is loaded."""
+    result = agent._act_subscribe()
+    assert result.success is False
+
+
+def test_subscribe_daily_limit(
+    agent: Agent, mock_moltbook: MagicMock
+) -> None:
+    """SUBSCRIBE blocked when daily limit reached."""
+    agent._state.subscribes_today = 5  # default max
+    agent._recent_feed = _feed_posts(1)
+
+    result = agent._act_subscribe()
+
+    assert result.success is False
+    mock_moltbook.subscribe_submolt.assert_not_called()
+
+
+# --- Decision context with new counters ---
+
+
+def test_decision_context_includes_new_counters(agent: Agent) -> None:
+    """Decision context includes upvote, follow, subscribe counters."""
+    agent._state.upvotes_today = 5
+    agent._state.follows_today = 3
+    agent._state.subscribes_today = 1
+
+    context = agent._build_decision_context()
+
+    assert "Upvotes today: 5/50" in context
+    assert "Follows today: 3/20" in context
+    assert "Subscribes today: 1/5" in context
+
+
+def test_decision_context_upvote_limit(agent: Agent) -> None:
+    """Decision context flags when upvote limit reached."""
+    agent._state.upvotes_today = 50
+    context = agent._build_decision_context()
+    assert "CONSTRAINT" in context
+    assert "UPVOTE" in context
+
+
+def test_decision_context_follow_limit(agent: Agent) -> None:
+    """Decision context flags when follow limit reached."""
+    agent._state.follows_today = 20
+    context = agent._build_decision_context()
+    assert "CONSTRAINT" in context
+    assert "FOLLOW" in context
+
+
+def test_daily_reset_clears_new_counters(agent: Agent) -> None:
+    """Daily reset clears upvotes, downvotes, follows, subscribes."""
+    agent._state.upvotes_today = 10
+    agent._state.downvotes_today = 3
+    agent._state.follows_today = 7
+    agent._state.subscribes_today = 2
+    agent._state.last_reset_date = "1970-01-01"  # Force reset
+
+    agent._state.reset_daily_counters()
+
+    assert agent._state.upvotes_today == 0
+    assert agent._state.downvotes_today == 0
+    assert agent._state.follows_today == 0
+    assert agent._state.subscribes_today == 0

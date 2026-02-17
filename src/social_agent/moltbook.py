@@ -399,3 +399,75 @@ class MoltbookClient:
             )
 
         return HeartbeatResult()
+
+    def upvote_post(self, post_id: str) -> PostResult:
+        """Upvote a post.
+
+        Args:
+            post_id: ID of the post to upvote.
+        """
+        logger.info("Upvoting post %s", post_id)
+        resp = self._execute("post", f"/posts/{post_id}/upvote")
+
+        if "error" in resp:
+            return PostResult(success=False, error=resp["error"])
+
+        status = resp.get("status", 0)
+        if status not in (200, 201):
+            return PostResult(success=False, error=f"HTTP {status}: {resp.get('body')}")
+
+        return PostResult(post_id=post_id)
+
+    def downvote_post(self, post_id: str) -> PostResult:
+        """Downvote a low-quality post.
+
+        Args:
+            post_id: ID of the post to downvote.
+        """
+        logger.info("Downvoting post %s", post_id)
+        resp = self._execute("post", f"/posts/{post_id}/downvote")
+
+        if "error" in resp:
+            return PostResult(success=False, error=resp["error"])
+
+        status = resp.get("status", 0)
+        if status not in (200, 201):
+            return PostResult(success=False, error=f"HTTP {status}: {resp.get('body')}")
+
+        return PostResult(post_id=post_id)
+
+    def follow_agent(self, agent_name: str) -> PostResult:
+        """Follow another agent.
+
+        Args:
+            agent_name: Username of the agent to follow.
+        """
+        logger.info("Following agent %s", agent_name)
+        resp = self._execute("post", f"/agents/{agent_name}/follow")
+
+        if "error" in resp:
+            return PostResult(success=False, error=resp["error"])
+
+        status = resp.get("status", 0)
+        if status not in (200, 201):
+            return PostResult(success=False, error=f"HTTP {status}: {resp.get('body')}")
+
+        return PostResult(post_id=agent_name)
+
+    def subscribe_submolt(self, submolt_name: str) -> PostResult:
+        """Subscribe to a submolt community.
+
+        Args:
+            submolt_name: Name of the submolt to subscribe to.
+        """
+        logger.info("Subscribing to submolt %s", submolt_name)
+        resp = self._execute("post", f"/submolts/{submolt_name}/subscribe")
+
+        if "error" in resp:
+            return PostResult(success=False, error=resp["error"])
+
+        status = resp.get("status", 0)
+        if status not in (200, 201):
+            return PostResult(success=False, error=f"HTTP {status}: {resp.get('body')}")
+
+        return PostResult(post_id=submolt_name)

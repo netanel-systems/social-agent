@@ -16,6 +16,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _DEFAULT_CYCLE_INTERVAL = 15  # 15 seconds (testing mode)
 _DEFAULT_MAX_POSTS = 5
 _DEFAULT_MAX_REPLIES = 20
+_DEFAULT_MAX_UPVOTES = 50
+_DEFAULT_MAX_DOWNVOTES = 10
+_DEFAULT_MAX_FOLLOWS = 20
+_DEFAULT_MAX_SUBSCRIBES = 5
 _DEFAULT_MAX_CYCLES = 500
 _DEFAULT_QUALITY_THRESHOLD = 0.7
 _DEFAULT_CIRCUIT_BREAKER = 5
@@ -64,6 +68,22 @@ class Settings(BaseSettings):
     max_replies_per_day: int = Field(
         default=_DEFAULT_MAX_REPLIES,
         description="Maximum replies per day",
+    )
+    max_upvotes_per_day: int = Field(
+        default=_DEFAULT_MAX_UPVOTES,
+        description="Maximum post upvotes per day",
+    )
+    max_downvotes_per_day: int = Field(
+        default=_DEFAULT_MAX_DOWNVOTES,
+        description="Maximum post downvotes per day",
+    )
+    max_follows_per_day: int = Field(
+        default=_DEFAULT_MAX_FOLLOWS,
+        description="Maximum agent follows per day",
+    )
+    max_subscribes_per_day: int = Field(
+        default=_DEFAULT_MAX_SUBSCRIBES,
+        description="Maximum submolt subscribes per day",
     )
     max_cycles: int = Field(
         default=_DEFAULT_MAX_CYCLES,
@@ -131,6 +151,10 @@ class Settings(BaseSettings):
     @field_validator(
         "max_posts_per_day",
         "max_replies_per_day",
+        "max_upvotes_per_day",
+        "max_downvotes_per_day",
+        "max_follows_per_day",
+        "max_subscribes_per_day",
         "max_cycles",
         "circuit_breaker_threshold",
     )

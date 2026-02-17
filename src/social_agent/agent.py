@@ -41,6 +41,10 @@ class Action(StrEnum):
     REPLY = "REPLY"
     CREATE_POST = "CREATE_POST"
     ANALYZE = "ANALYZE"
+    UPVOTE = "UPVOTE"
+    DOWNVOTE = "DOWNVOTE"
+    FOLLOW = "FOLLOW"
+    SUBSCRIBE = "SUBSCRIBE"
 
 
 # --- State persistence ---
@@ -55,6 +59,10 @@ class AgentState:
 
     posts_today: int = 0
     replies_today: int = 0
+    upvotes_today: int = 0
+    downvotes_today: int = 0
+    follows_today: int = 0
+    subscribes_today: int = 0
     cycle_count: int = 0
     consecutive_failures: int = 0
     last_reset_date: str = ""
@@ -66,6 +74,10 @@ class AgentState:
         if self.last_reset_date != today:
             self.posts_today = 0
             self.replies_today = 0
+            self.upvotes_today = 0
+            self.downvotes_today = 0
+            self.follows_today = 0
+            self.subscribes_today = 0
             self.last_reset_date = today
             logger.info("Daily counters reset for %s", today)
 
@@ -337,6 +349,9 @@ class Agent:
             f"Cycle: {self._state.cycle_count}",
             f"Posts today: {self._state.posts_today}/{self._settings.max_posts_per_day}",
             f"Replies today: {self._state.replies_today}/{self._settings.max_replies_per_day}",
+            f"Upvotes today: {self._state.upvotes_today}/{self._settings.max_upvotes_per_day}",
+            f"Follows today: {self._state.follows_today}/{self._settings.max_follows_per_day}",
+            f"Subscribes today: {self._state.subscribes_today}/{self._settings.max_subscribes_per_day}",
             f"Feed posts loaded: {len(self._recent_feed)}",
             f"Research context available: {'YES' if self._research_context else 'NO'}",
         ]
@@ -344,6 +359,12 @@ class Agent:
             parts.append("CONSTRAINT: Daily post limit reached. Cannot CREATE_POST.")
         if self._state.replies_today >= self._settings.max_replies_per_day:
             parts.append("CONSTRAINT: Daily reply limit reached. Cannot REPLY.")
+        if self._state.upvotes_today >= self._settings.max_upvotes_per_day:
+            parts.append("CONSTRAINT: Daily upvote limit reached. Cannot UPVOTE.")
+        if self._state.follows_today >= self._settings.max_follows_per_day:
+            parts.append("CONSTRAINT: Daily follow limit reached. Cannot FOLLOW.")
+        if self._state.subscribes_today >= self._settings.max_subscribes_per_day:
+            parts.append("CONSTRAINT: Daily subscribe limit reached. Cannot SUBSCRIBE.")
         if not self._recent_feed:
             parts.append("NOTE: No feed loaded yet. Consider READ_FEED first.")
         if not self._research_context:
@@ -370,6 +391,10 @@ class Agent:
             Action.REPLY: self._act_reply,
             Action.CREATE_POST: self._act_create_post,
             Action.ANALYZE: self._act_analyze,
+            Action.UPVOTE: self._act_upvote,
+            Action.DOWNVOTE: self._act_downvote,
+            Action.FOLLOW: self._act_follow,
+            Action.SUBSCRIBE: self._act_subscribe,
         }
         handler = handlers.get(action)
         if handler is None:
@@ -671,6 +696,143 @@ class Agent:
             quality_score=result.score,
             details=details,
         )
+
+    # --- New engagement handlers (Issue #49) ---
+
+    def _act_upvote(self) -> CycleResult:
+        """Upvote the top post from the feed.
+
+        Rotates the feed immediately so repeated upvote calls always
+        target a fresh post, consistent with how _act_reply works.
+        """
+        if not self._recent_feed:
+            details = "No feed loaded — cannot upvote"
+            self._log_activity("UPVOTE", success=False, details=details)
+            return CycleResult(action="UPVOTE", success=False, details=details)
+
+        if self._state.upvotes_today >= self._settings.max_upvotes_per_day:
+            details = "Daily upvote limit reached"
+            self._log_activity("UPVOTE", success=False, details=details)
+            return CycleResult(action="UPVOTE", success=False, details=details)
+
+        post = self._recent_feed[0]
+        self._recent_feed = self._recent_feed[1:]
+
+        result = self._moltbook.upvote_post(post.id)
+        if not result.success:
+            details = f"Upvote failed: {result.error}"
+            self._log_activity("UPVOTE", success=False, details=details)
+            return CycleResult(action="UPVOTE", success=False, details=details)
+
+        self._state.upvotes_today += 1
+        details = f"Upvoted: {post.title[:50]}"
+        self._log_activity("UPVOTE", success=True, details=details)
+        self._notify(details, "info")
+        return CycleResult(action="UPVOTE", success=True, details=details)
+
+    def _act_downvote(self) -> CycleResult:
+        """Downvote the top post from the feed.
+
+        Rotates the feed immediately so the same low-quality post is
+        never targeted twice in a row.
+        """
+        if not self._recent_feed:
+            details = "No feed loaded — cannot downvote"
+            self._log_activity("DOWNVOTE", success=False, details=details)
+            return CycleResult(action="DOWNVOTE", success=False, details=details)
+
+        if self._state.downvotes_today >= self._settings.max_downvotes_per_day:
+            details = "Daily downvote limit reached"
+            self._log_activity("DOWNVOTE", success=False, details=details)
+            return CycleResult(action="DOWNVOTE", success=False, details=details)
+
+        post = self._recent_feed[0]
+        self._recent_feed = self._recent_feed[1:]
+
+        result = self._moltbook.downvote_post(post.id)
+        if not result.success:
+            details = f"Downvote failed: {result.error}"
+            self._log_activity("DOWNVOTE", success=False, details=details)
+            return CycleResult(action="DOWNVOTE", success=False, details=details)
+
+        self._state.downvotes_today += 1
+        details = f"Downvoted: {post.title[:50]}"
+        self._log_activity("DOWNVOTE", success=True, details=details)
+        return CycleResult(action="DOWNVOTE", success=True, details=details)
+
+    def _act_follow(self) -> CycleResult:
+        """Follow the author of the top feed post.
+
+        Uses the post's author field. Rotates the feed after picking
+        the post to keep the feed fresh for future cycles.
+        """
+        if not self._recent_feed:
+            details = "No feed loaded — cannot follow"
+            self._log_activity("FOLLOW", success=False, details=details)
+            return CycleResult(action="FOLLOW", success=False, details=details)
+
+        if self._state.follows_today >= self._settings.max_follows_per_day:
+            details = "Daily follow limit reached"
+            self._log_activity("FOLLOW", success=False, details=details)
+            return CycleResult(action="FOLLOW", success=False, details=details)
+
+        post = self._recent_feed[0]
+        self._recent_feed = self._recent_feed[1:]
+
+        author = post.author
+        if not author:
+            details = "Post has no author — cannot follow"
+            self._log_activity("FOLLOW", success=False, details=details)
+            return CycleResult(action="FOLLOW", success=False, details=details)
+
+        result = self._moltbook.follow_agent(author)
+        if not result.success:
+            details = f"Follow failed: {result.error}"
+            self._log_activity("FOLLOW", success=False, details=details)
+            return CycleResult(action="FOLLOW", success=False, details=details)
+
+        self._state.follows_today += 1
+        details = f"Followed: {author}"
+        self._log_activity("FOLLOW", success=True, details=details)
+        self._notify(details, "info")
+        return CycleResult(action="FOLLOW", success=True, details=details)
+
+    def _act_subscribe(self) -> CycleResult:
+        """Subscribe to the submolt of the top feed post.
+
+        Uses the post's submolt field. Rotates the feed after picking
+        the post to keep the feed fresh for future cycles.
+        """
+        if not self._recent_feed:
+            details = "No feed loaded — cannot subscribe"
+            self._log_activity("SUBSCRIBE", success=False, details=details)
+            return CycleResult(action="SUBSCRIBE", success=False, details=details)
+
+        if self._state.subscribes_today >= self._settings.max_subscribes_per_day:
+            details = "Daily subscribe limit reached"
+            self._log_activity("SUBSCRIBE", success=False, details=details)
+            return CycleResult(action="SUBSCRIBE", success=False, details=details)
+
+        post = self._recent_feed[0]
+        self._recent_feed = self._recent_feed[1:]
+
+        submolt = post.submolt
+        if not submolt:
+            details = "Post has no submolt — cannot subscribe"
+            self._log_activity("SUBSCRIBE", success=False, details=details)
+            return CycleResult(action="SUBSCRIBE", success=False, details=details)
+
+        result = self._moltbook.subscribe_submolt(submolt)
+        if not result.success:
+            details = f"Subscribe failed: {result.error}"
+            self._log_activity("SUBSCRIBE", success=False, details=details)
+            return CycleResult(action="SUBSCRIBE", success=False, details=details)
+
+        self._state.subscribes_today += 1
+        details = f"Subscribed to: {submolt}"
+        self._log_activity("SUBSCRIBE", success=True, details=details)
+        self._notify(details, "info")
+        return CycleResult(action="SUBSCRIBE", success=True, details=details)
 
     # --- Heartbeat ---
 
