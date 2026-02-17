@@ -855,7 +855,7 @@ def test_research_empty_results(
     mock_notifier: MagicMock,
     tmp_dir: Path,
 ) -> None:
-    """RESEARCH handles empty search results."""
+    """RESEARCH soft-skips empty search results (success=True, miss counter increments)."""
     from social_agent.sandbox import ExecutionResult
 
     mock_sandbox = MagicMock()
@@ -877,8 +877,11 @@ def test_research_empty_results(
     )
 
     result = agent._act_research()
-    assert result.success is False
-    assert "No results" in result.details
+    # Empty results are a soft-skip — not a circuit-breaker-eligible failure
+    assert result.success is True
+    assert "no results" in result.details.lower()
+    assert agent._research_miss_count == 1
+    assert agent._state.consecutive_failures == 0
 
 
 def test_research_sandbox_failure(
@@ -1445,3 +1448,150 @@ def test_git_push_uses_state_path_parent(
         state_path.resolve().parent,
         "agent startup: sandbox_id=sbx_new_123",
     )
+
+
+# --- RESEARCH miss counter + fallback hint (Issue #63) ---
+
+
+def test_research_sandbox_failure_does_not_increment_miss_count(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Sandbox execution failure is a genuine error: success=False, miss_count unchanged."""
+    from social_agent.sandbox import ExecutionResult
+
+    mock_sandbox = MagicMock()
+    mock_sandbox.execute_code.return_value = ExecutionResult(
+        success=False, error="sandbox crashed"
+    )
+    mock_brain.call.return_value = _brain_result(
+        "QUERY: AI agents\nTOPIC: AI\nRATIONALE: test"
+    )
+
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        sandbox=mock_sandbox,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+
+    result = agent._act_research()
+
+    assert result.success is False
+    assert "Search failed" in result.details
+    assert agent._research_miss_count == 0  # Miss counter NOT touched on genuine failure
+
+
+def test_research_parse_error_does_not_increment_miss_count(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """JSON parse error is a genuine error: success=False, miss_count unchanged."""
+    from social_agent.sandbox import ExecutionResult
+
+    mock_sandbox = MagicMock()
+    mock_sandbox.execute_code.return_value = ExecutionResult(
+        stdout=["not valid json {{{"], success=True
+    )
+    mock_brain.call.return_value = _brain_result(
+        "QUERY: AI agents\nTOPIC: AI\nRATIONALE: test"
+    )
+
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        sandbox=mock_sandbox,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+
+    result = agent._act_research()
+
+    assert result.success is False
+    assert agent._research_miss_count == 0  # Miss counter NOT touched on parse failure
+
+
+def test_two_research_misses_trigger_fallback_hint(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """After 2 empty-result RESEARCH cycles, decision context shows fallback hint."""
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+    agent._research_miss_count = 2
+
+    context = agent._build_decision_context()
+
+    assert "Skip RESEARCH" in context
+    assert "Consider RESEARCH before CREATE_POST" not in context
+
+
+def test_one_research_miss_still_shows_research_note(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """Below threshold, decision context still shows original RESEARCH note."""
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+    agent._research_miss_count = 1
+
+    context = agent._build_decision_context()
+
+    assert "Consider RESEARCH before CREATE_POST" in context
+    assert "Skip RESEARCH" not in context
+
+
+def test_research_miss_count_resets_on_non_research_success(
+    mock_settings: MagicMock,
+    mock_brain: MagicMock,
+    mock_moltbook: MagicMock,
+    mock_notifier: MagicMock,
+    tmp_dir: Path,
+) -> None:
+    """A successful non-RESEARCH action resets _research_miss_count via cycle()."""
+    agent = Agent(
+        settings=mock_settings,
+        brain=mock_brain,
+        moltbook=mock_moltbook,
+        notifier=mock_notifier,
+        state_path=tmp_dir / "state.json",
+        activity_log_path=tmp_dir / "logs" / "activity.jsonl",
+    )
+    agent._research_miss_count = 2
+
+    # Simulate cycle() deciding and executing a successful READ_FEED action
+    mock_brain.call.return_value = _brain_result("READ_FEED")
+    mock_moltbook.get_feed.return_value = FeedResult(posts=_feed_posts(3))
+
+    agent.cycle()
+
+    assert agent._research_miss_count == 0
