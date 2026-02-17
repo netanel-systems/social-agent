@@ -1,5 +1,7 @@
 # Minimal dependencies for dashboard server only
-# Does not include agent dependencies (netanel-core)
+
+# netanel-core installed from GitHub (will switch to PyPI after publication)
+netanel-core @ git+https://github.com/netanel-systems/netanel-core.git@main
 
 e2b-code-interpreter>=1.0
 httpx>=0.27
