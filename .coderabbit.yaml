@@ -1,0 +1,121 @@
+# CodeRabbit Configuration for social-agent
+# Netanel Systems — NASA-grade review standards
+# Docs: https://docs.coderabbit.ai/reference/configuration
+
+language: "en-US"
+early_access: true
+enable_free_tier: false
+
+reviews:
+  profile: "assertive"
+
+  request_changes_workflow: true
+  abort_on_close: true
+  fail_commit_status: false
+
+  high_level_summary: true
+  collapse_walkthrough: false
+  review_status: true
+  commit_status: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  suggested_reviewers: false
+  auto_apply_labels: false
+
+  path_instructions:
+    - path: "src/**/*.py"
+      instructions: |
+        Enforce these standards:
+        - Type hints on all function signatures
+        - Pydantic models with extra="forbid" for all config/data classes
+        - All safety bounds must have min/max constraints (JPL Power of 10)
+        - No unbounded loops — every loop must have a termination condition
+        - Validate all inputs/outputs, assert invariants
+        - Use encoding="utf-8" for all file operations
+        - contextlib.suppress over bare try/except for expected exceptions
+        - shlex.quote for all shell command inputs
+    - path: "tests/**/*.py"
+      instructions: |
+        Ensure pytest best practices:
+        - Use fixtures for setup/teardown, no hardcoded values
+        - Test edge cases and error paths, not just happy path
+        - Use tmp_path for file operations
+        - Async tests use pytest-asyncio auto mode
+    - path: "*.yaml"
+      instructions: "Validate YAML structure and check for common misconfigurations."
+    - path: "*.md"
+      instructions: |
+        Check for:
+        - Code blocks must have language identifiers
+        - Internal links must be valid
+        - Section numbering consistency
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT REVIEW"
+    base_branches:
+      - "main"
+
+  pre_merge_checks:
+    title:
+      mode: "warning"
+    description:
+      mode: "warning"
+    docstrings:
+      mode: "warning"
+      threshold: 80
+
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+
+  tools:
+    ruff:
+      enabled: true
+    gitleaks:
+      enabled: true
+    checkov:
+      enabled: true
+    shellcheck:
+      enabled: true
+    ast-grep:
+      essential_rules: true
+    markdownlint:
+      enabled: true
+    yamllint:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "global"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
+
+code_generation:
+  docstrings:
+    language: "en-US"
+    path_instructions:
+      - path: "src/**/*.py"
+        instructions: "Google-style docstrings with Args, Returns, Raises sections."
+  unit_tests:
+    path_instructions:
+      - path: "src/**/*.py"
+        instructions: "Use pytest with fixtures. Test edge cases and error paths."
